@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f5f7f8" />
+  <meta name="description" content="Otel Housekeeping yönetim paneli" />
+  <title>Otel Housekeeping</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="responsive.css" />
+</head>
+<body>
+  <section class="auth-screen" id="authScreen" aria-label="Giriş ekranı">
+    <div class="auth-panel">
+      <div class="brand auth-brand"><span class="brand-mark">OH</span><span>Otel<br /><strong>Housekeeping</strong></span></div>
+      <p class="eyebrow">Marina Palace Hotel</p>
+      <h1>Operasyon paneline giriş yapın</h1>
+      <p class="subheading">Oda durumlarını ve ekip işlerini yönetmek için hesabınızla devam edin.</p>
+      <form id="loginForm" class="auth-form">
+        <label for="loginEmail">E-posta</label>
+        <input id="loginEmail" type="email" autocomplete="email" placeholder="ornek@otel.com" required />
+        <label for="loginPassword">Şifre</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Şifrenizi girin" required />
+        <button class="primary-button" type="submit">Giriş yap</button>
+        <p class="auth-error" id="authError" role="alert"></p>
+      </form>
+      <button class="auth-switch" id="showRegister" type="button">Yeni personel kaydı oluştur</button>
+      <form id="registerForm" class="auth-form register-form" hidden>
+        <label for="registerName">Ad soyad</label>
+        <input id="registerName" type="text" autocomplete="name" placeholder="Ad Soyad" required />
+        <label for="registerEmail">E-posta</label>
+        <input id="registerEmail" type="email" autocomplete="email" placeholder="ornek@otel.com" required />
+        <label for="registerPassword">Şifre</label>
+        <input id="registerPassword" type="password" autocomplete="new-password" minlength="6" placeholder="En az 6 karakter" required />
+        <button class="primary-button" type="submit">Kayıt ol</button>
+        <button class="auth-switch" id="showLogin" type="button">Giriş ekranına dön</button>
+      </form>
+    </div>
+  </section>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><span class="brand-mark">OH</span><span>Otel<br /><strong>Housekeeping</strong></span><button class="sidebar-close" id="sidebarClose" aria-label="Menüyü kapat">×</button></div>
+      <div class="hotel-switcher"><span class="status-dot"></span><span><small>Aktif tesis</small><strong>Marina Palace Hotel</strong></span><span class="chevron">⌄</span></div>
+      <nav class="nav" aria-label="Ana navigasyon">
+        <p class="nav-label">ÇALIŞMA ALANI</p>
+        <button class="nav-item active" data-view="dashboard" data-roles="admin,supervisor,housekeeper,front_desk,maintenance"><span class="nav-icon">⌂</span> Genel Bakış</button>
+        <button class="nav-item" data-view="rooms" data-roles="admin,supervisor,housekeeper,front_desk"><span class="nav-icon">▦</span> Odalar <b class="nav-count" data-count="rooms">0</b></button>
+        <button class="nav-item" data-view="issues" data-roles="admin,supervisor,housekeeper,maintenance"><span class="nav-icon">△</span> Sorunlar <b class="nav-count alert" data-count="issues">0</b></button>
+        <button class="nav-item" data-view="requests" data-roles="admin,supervisor,housekeeper,front_desk"><span class="nav-icon">♧</span> Misafir Talepleri <b class="nav-count" data-count="guest_requests">0</b></button>
+        <p class="nav-label">YÖNETİM</p>
+        <button class="nav-item" data-view="reports" data-roles="admin,supervisor"><span class="nav-icon">◒</span> Raporlar</button>
+        <button class="nav-item" data-view="users" data-roles="admin"><span class="nav-icon">♙</span> Kullanıcılar</button>
+        <button class="nav-item" data-view="settings" data-roles="admin"><span class="nav-icon">⚙</span> Otel Ayarları</button>
+      </nav>
+      <div class="sidebar-footer"><div class="user-mini"><span class="avatar coral" id="userAvatar">SD</span><span><strong id="userName">Kullanıcı</strong><small id="userRole">-</small></span><button class="more logout-button" data-action="logout" aria-label="Çıkış yap">↪</button></div></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar"><button class="menu-button" id="menuButton" aria-label="Menüyü aç">☰</button><div class="breadcrumb"><span id="hotelNameBreadcrumb">Marina Palace</span><b>/</b><strong id="pageTitle">Genel Bakış</strong></div><div class="top-actions"><div class="sync-pill"><span class="online-dot"></span><span>Çevrimiçi</span><small id="syncText">· Güncel</small></div><button class="icon-button" aria-label="Bildirimler">♢<i></i></button><button class="top-logout" data-action="logout">Çıkış</button><div class="avatar coral" id="topAvatar">SD</div></div></header>
+      <div class="page" id="app"></div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && ((auth.uid == $uid && (!data.exists() || newData.child('role').val() == 'pending')) || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+      }
+    },
+    "settings": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+    },
+    "rooms": {
+      ".read": "auth != null",
+      "$roomId": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'supervisor' || root.child('users').child(auth.uid).child('role').val() == 'housekeeper' || root.child('users').child(auth.uid).child('role').val() == 'front_desk')"
+      }
+    },
+    "room_status_logs": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "issues": {
+      ".read": "auth != null",
+      "$issueId": {
+        ".write": "auth != null"
+      }
+    },
+    "guest_requests": {
+      ".read": "auth != null",
+      "$requestId": {
+        ".write": "auth != null"
+      }
+    }
+  }
+}
