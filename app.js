@@ -189,7 +189,7 @@ function attachDataListeners(){
   firebaseDatabase.ref('settings').on('value', snapshot => { records.settings = snapshot.val() || {}; applyHotelName(); render(currentView); });
 }
 function applyHotelName(){
-  const hotelName = records.settings.hotelName || 'Marina Palace Hotel';
+  const hotelName = records.settings.hotelName || 'Cityport Hotel';
   document.querySelector('.hotel-switcher strong').textContent = hotelName;
   document.querySelector('#hotelNameBreadcrumb').textContent = hotelName.replace(/ Hotel$/,'');
   document.querySelector('.auth-screen .eyebrow').textContent = hotelName;
