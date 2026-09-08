@@ -85,6 +85,11 @@ body { -webkit-font-smoothing: antialiased; }
 .room-status-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .room-status-choice { min-height: 32px; border: 1px solid var(--line); border-radius: 7px; padding: 6px 7px; background: var(--surface); color: #536467; font: 700 10px 'DM Sans'; cursor: pointer; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
 .room-status-choice:hover { transform: translateY(-1px); }
+.room-card-actions.has-housekeeping-start { position: relative; min-height: 76px; display: block; }
+.housekeeping-start-choice { position: absolute; top: 0; right: 0; width: 76px; height: 76px; display: block; }
+.housekeeping-start-choice .room-status-choice { width: 76px; height: 76px; min-height: 76px; border: 0; border-radius: 50%; padding: 12px; background: #e2b34b; color: #fff; font: 800 11px/1.15 'DM Sans'; box-shadow: 0 8px 18px rgba(169, 123, 32, .24); }
+.housekeeping-start-choice .room-status-choice::before { content: '▶'; display: block; margin-bottom: 4px; font-size: 16px; }
+.housekeeping-start-choice .room-status-choice:hover { background: #c9952c; transform: scale(1.04); }
 .status-choice-clean { border-color: #bfe5d5; color: #218b68; background: #f7fdf9; }
 .status-choice-clean:hover { background: #e8f7ef; }
 .status-choice-dirty { border-color: #f0c5bd; color: #c45a48; background: #fff9f7; }
@@ -152,6 +157,10 @@ body { -webkit-font-smoothing: antialiased; }
   .room-card-top { display: grid; }
   .room-status { justify-self: start; }
   .room-card-actions button { width: 100%; min-height: 34px; }
+  .room-card-actions.has-housekeeping-start { min-height: 66px; }
+  .housekeeping-start-choice { width: 66px; height: 66px; }
+  .housekeeping-start-choice .room-status-choice { width: 66px; height: 66px; min-height: 66px; font-size: 9px; padding: 9px; }
+  .housekeeping-start-choice .room-status-choice::before { font-size: 14px; }
   .room-status-choices { gap: 4px; }
   .room-status-choice { min-height: 28px; padding: 5px 4px; font-size: 9px; }
   .room-status-select { flex: 1; min-width: 0; }
