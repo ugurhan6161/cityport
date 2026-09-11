@@ -79,7 +79,20 @@ function setSyncState(message, online = true){
   document.querySelector('#syncText').textContent = `· ${message}`;
 }
 function roomRecord([number, status, key, floor]){
-  return { roomNumber: number, status, statusKey: key, floor, updatedAt: firebase.database.ServerValue.TIMESTAMP };
+  return {
+    roomNumber: number,
+    status,
+    statusKey: key,
+    floor,
+    // --- Çakışma önleme: bu değişikliğin panelden geldiğini ve
+    //     eklenti tarafından henüz ElektraWeb'e uygulanmadığını işaretle ---
+    source: 'panel',
+    pendingSync: true,
+    requestedStatusKey: key,
+    requestedLabel: status,
+    requestedAt: firebase.database.ServerValue.TIMESTAMP,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  };
 }
 function saveRoomToFirebase(room, previousStatus){
   if (!firebaseReady || !firebaseDatabase) return;
