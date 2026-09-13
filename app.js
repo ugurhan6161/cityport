@@ -21,6 +21,7 @@ let currentRole = null;
 let registrationInProgress = false;
 let roomFloorFilter = 'all';
 let roomStatusFilter = 'all';
+let roomCheckoutFilter = 'all';
 const roleLabels = { admin:'Yönetici', supervisor:'Süpervizör', housekeeper:'Kat hizmetleri', front_desk:'Ön büro', maintenance:'Teknik servis' };
 const roleViews = {
   admin: ['dashboard','rooms','issues','requests','reports','users','settings'],
@@ -128,7 +129,10 @@ function loadRoomsFromFirebase(){
       Boolean(remoteRoom.occupied),
       remoteRoom.guestName || null,
       remoteRoom.agency || null,
-      remoteRoom.paxInfo || null
+      remoteRoom.paxInfo || null,
+      // --- Giriş / Çıkış tarihleri (eklentiden) - yine SONA ekleniyor ---
+      remoteRoom.checkinDate || null,
+      remoteRoom.checkoutDate || null
     ]).sort((first, second) => first[0].localeCompare(second[0], 'tr', { numeric: true }));
     rooms.splice(0, rooms.length, ...syncedRooms);
     render(currentView);
@@ -267,14 +271,56 @@ function roomOccupancyLine(occupied, guestName, agency, paxInfo){
   }
   return `<div class="room-occupancy empty" style="font-size:11px;color:#6b8f7a;margin:4px 0;font-weight:600;">○ Boş</div>`;
 }
-function roomCards(sourceRooms=rooms){ return sourceRooms.map(([number,status,key,floor,roomType,occupied,guestName,agency,paxInfo]) => { const activity=roomActivity(number); const statusChoices=allowedRoomStatuses(currentRole,key).filter(nextKey=>nextKey!==key); const canAddRequest=currentRole!=='housekeeper'; const isHousekeepingStart=currentRole==='housekeeper'&&statusChoices.includes('progress'); return `<article class="room-card ${isHousekeepingStart?'housekeeping-room-card':''}" data-room-interaction data-status="${esc(key)}" data-room="${esc(number)}" data-action="room-details"><div class="room-card-top"><div><h3>${esc(number)}</h3><p>${esc(floor)}</p></div><span class="room-status ${esc(key)}"><i></i>${esc(status)}</span></div>${roomOccupancyLine(occupied,guestName,agency,paxInfo)}<div class="room-alerts">${activity.requests.length?`<span class="room-alert request-alert">♧ ${activity.requests.length} talep</span>`:''}${activity.issues.length?`<span class="room-alert issue-alert">△ ${activity.issues.length} sorun</span>`:''}${!activity.requests.length&&!activity.issues.length?'<span class="room-clear">Açık kayıt yok</span>':''}</div><div class="room-card-actions ${isHousekeepingStart?'has-housekeeping-start':''}">${canAddRequest?`<button class="mini-button room-request-action" data-action="add-room-request" data-room="${esc(number)}"><span aria-hidden="true">＋</span> Talep ekle</button>`:''}${statusChoices.length?`<div class="room-status-choices ${isHousekeepingStart?'housekeeping-start-choice':''}" aria-label="Yeni oda durumu">${statusChoices.map(nextKey=>`<button class="room-status-choice status-choice-${esc(nextKey)}" data-action="set-room-status" data-room="${esc(number)}" data-status-key="${esc(nextKey)}">${isHousekeepingStart&&nextKey==='progress'?'Temizliğe başla':labels[nextKey]}</button>`).join('')}</div>`:''}</div>${currentRole==='admin'?`<div class="room-admin-actions"><button class="mini-button room-admin-action" data-action="edit-room" data-id="${esc(number)}">Düzenle</button><button class="mini-button room-admin-action" data-action="delete-room" data-id="${esc(number)}">Sil</button></div>`:''}</article>`; }).join(''); }
+// --- Giriş/Çıkış tarihi ayrıştırma ve "bugün çıkış" kontrolü ---
+// ElektraWeb tarihleri genellikle "gg.aa.yyyy" (bazen saat eklenmiş) formatında
+// geliyor. Farklı bir format kullanılıyorsa (örn. "gg/aa/yyyy") da destekleniyor.
+function parseElektraDate(value){
+  if (!value) return null;
+  const datePart = String(value).trim().split(' ')[0];
+  const match = datePart.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})$/);
+  if (!match) return null;
+  let [, day, month, year] = match;
+  if (year.length === 2) year = `20${year}`;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+function isSameDay(a, b){
+  return Boolean(a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate());
+}
+function isCheckoutToday(checkoutDateValue){
+  const date = parseElektraDate(checkoutDateValue);
+  return Boolean(date && isSameDay(date, new Date()));
+}
+function stayInfoLine(checkinDate, checkoutDate){
+  if (!checkinDate && !checkoutDate) return '';
+  const parts = [];
+  if (checkinDate) parts.push(`Giriş: ${esc(checkinDate)}`);
+  if (checkoutDate) parts.push(`Çıkış: ${esc(checkoutDate)}`);
+  return `<div class="room-stay-info" style="font-size:11px;color:#536467;margin:2px 0 4px;">${parts.join(' · ')}</div>`;
+}
+function stayDetailSection(guestName, agency, paxInfo, checkinDate, checkoutDate){
+  if (!guestName && !agency && !paxInfo && !checkinDate && !checkoutDate) return '';
+  const metaParts = [agency, paxInfo].filter(Boolean).map(esc).join(' · ');
+  const dateParts = [];
+  if (checkinDate) dateParts.push(`Giriş: ${esc(checkinDate)}`);
+  if (checkoutDate) dateParts.push(`Çıkış: ${esc(checkoutDate)}`);
+  return `<section class="room-detail-section"><h3>Konaklama bilgisi</h3><ul class="room-detail-list"><li><div class="room-detail-item-head"><strong>${guestName ? esc(guestName) : 'Misafir bilgisi yok'}</strong></div><span>${metaParts || '-'}</span><small>${dateParts.join(' · ') || 'Giriş/çıkış tarihi bulunamadı'}</small></li></ul></section>`;
+}
+function roomCards(sourceRooms=rooms){ return sourceRooms.map(([number,status,key,floor,roomType,occupied,guestName,agency,paxInfo,checkinDate,checkoutDate]) => { const activity=roomActivity(number); const statusChoices=allowedRoomStatuses(currentRole,key).filter(nextKey=>nextKey!==key); const canAddRequest=currentRole!=='housekeeper'; const isHousekeepingStart=currentRole==='housekeeper'&&statusChoices.includes('progress'); const checkoutToday=isCheckoutToday(checkoutDate); return `<article class="room-card ${isHousekeepingStart?'housekeeping-room-card':''}" data-room-interaction data-status="${esc(key)}" data-room="${esc(number)}" data-action="room-details"><div class="room-card-top"><div><h3>${esc(number)}</h3><p>${esc(floor)}</p></div><span class="room-status ${esc(key)}"><i></i>${esc(status)}</span>${checkoutToday?`<span class="checkout-today-badge" title="Bugün çıkış yapacak" style="margin-left:6px;font-size:14px;">🧳</span>`:''}</div>${roomOccupancyLine(occupied,guestName,agency,paxInfo)}${stayInfoLine(checkinDate,checkoutDate)}<div class="room-alerts">${activity.requests.length?`<span class="room-alert request-alert">♧ ${activity.requests.length} talep</span>`:''}${activity.issues.length?`<span class="room-alert issue-alert">△ ${activity.issues.length} sorun</span>`:''}${!activity.requests.length&&!activity.issues.length?'<span class="room-clear">Açık kayıt yok</span>':''}</div><div class="room-card-actions ${isHousekeepingStart?'has-housekeeping-start':''}">${canAddRequest?`<button class="mini-button room-request-action" data-action="add-room-request" data-room="${esc(number)}"><span aria-hidden="true">＋</span> Talep ekle</button>`:''}${statusChoices.length?`<div class="room-status-choices ${isHousekeepingStart?'housekeeping-start-choice':''}" aria-label="Yeni oda durumu">${statusChoices.map(nextKey=>`<button class="room-status-choice status-choice-${esc(nextKey)}" data-action="set-room-status" data-room="${esc(number)}" data-status-key="${esc(nextKey)}">${isHousekeepingStart&&nextKey==='progress'?'Temizliğe başla':labels[nextKey]}</button>`).join('')}</div>`:''}</div>${currentRole==='admin'?`<div class="room-admin-actions"><button class="mini-button room-admin-action" data-action="edit-room" data-id="${esc(number)}">Düzenle</button><button class="mini-button room-admin-action" data-action="delete-room" data-id="${esc(number)}">Sil</button></div>`:''}</article>`; }).join(''); }
 function dashboard(){ const counts=rooms.reduce((acc,room)=>{acc[room[2]]=(acc[room[2]]||0)+1;return acc;},{}); const openIssues=recordRows('issues').filter(([,item])=>!['resolved','closed'].includes(item.status)).length; const pendingRequests=recordRows('guest_requests').filter(([,item])=>item.status!=='completed').length; return `${shellHeading(new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),'Günaydın, '+esc(currentName().split(' ')[0]),'Bugünün operasyon özeti ve ekip durumu burada.')}<section class="stats-grid">${stat('TOPLAM ODA',rooms.length,'Kayıtlı oda','▦')}${stat('TEMİZ ODA',counts.clean||0,'Güncel durum','✓')}${stat('AÇIK SORUN',openIssues,'Çözüm bekleyen','△')}${stat('BEKLEYEN TALEP',pendingRequests,'Misafir işleri','♧')}</section><div class="content-grid"><section class="panel"><div class="panel-head"><div><h2 class="panel-title">Oda durumu</h2><p class="panel-meta">Gerçek zamanlı Firebase verisi</p></div><button class="text-link" data-view="rooms">Tüm odaları gör →</button></div><div class="room-summary"><div class="room-head"><strong>${rooms.length} oda</strong><div class="legend"><span><i class="clean"></i>Temiz</span><span><i class="dirty"></i>Kirli</span><span><i class="progress"></i>İşlemde</span></div></div><div class="room-bars"><span class="clean" style="width:${rooms.length?(counts.clean||0)/rooms.length*100:0}%"></span><span class="dirty" style="width:${rooms.length?(counts.dirty||0)/rooms.length*100:0}%"></span><span class="progress" style="width:${rooms.length?(counts.progress||0)/rooms.length*100:0}%"></span><span class="inspect" style="width:${rooms.length?(counts.inspect||0)/rooms.length*100:0}%"></span><span class="broken" style="width:${rooms.length?(counts.broken||0)/rooms.length*100:0}%"></span></div><div class="room-stats">${Object.entries(labels).map(([key,label])=>`<span><b>${counts[key]||0}</b> ${label}</span>`).join('')}</div></div></section><aside class="panel"><div class="panel-head"><div><h2 class="panel-title">Hızlı işlemler</h2><p class="panel-meta">Sık kullanılan aksiyonlar</p></div></div><div class="quick-actions"><button class="quick-action" data-action="issue"><span>△</span>Sorun bildir</button><button class="quick-action" data-action="request"><span>♧</span>Talep oluştur</button><button class="quick-action" data-view="rooms"><span>▦</span>Odaları görüntüle</button><button class="quick-action" data-action="sync"><span>↻</span>Verileri eşitle</button></div></aside></div>`; }
 function roomDetails(number){
   const room=rooms.find(item=>String(item[0])===String(number)); const activity=roomActivity(number); const allRequests=recordRows('guest_requests').filter(([,item])=>String(item.roomNumber)===String(number)); const allIssues=recordRows('issues').filter(([,item])=>String(item.roomNumber)===String(number));
   const list=(items,empty,type)=>items.length?`<ul class="room-detail-list">${items.map(([id,item])=>`<li><div class="room-detail-item-head"><strong>${esc(item.title||item.requestType||'Kayıt')}</strong>${type==='request'?`<button class="complete-request-button ${item.status==='completed'?'is-complete':''}" data-action="complete-request" data-id="${esc(id)}" data-room="${esc(number)}" aria-label="Talebi tamamla" ${item.status==='completed'?'disabled':''}>✓</button>`:issueManageRoles.includes(currentRole)?`<span class="detail-actions"><button class="complete-request-button ${['resolved','closed'].includes(item.status)?'is-complete':''}" data-action="complete-issue" data-id="${esc(id)}" data-room="${esc(number)}" aria-label="Sorunu tamamla" ${['resolved','closed'].includes(item.status)?'disabled':''}>✓</button><button class="detail-delete-button" data-action="delete-issue" data-id="${esc(id)}" data-room="${esc(number)}" aria-label="Sorunu sil">×</button></span>`:''}</div><span>${esc(item.description||'Açıklama eklenmemiş')}</span><small>${statusText[item.status]||item.status||'Açık'} · ${priorityText[item.priority]||item.priority||'Normal'}${item.completedAt?` · Tamamlandı: ${esc(formatDateTime(item.completedAt))}`:''}</small></li>`).join('')}</ul>`:`<p class="room-detail-empty">${empty}</p>`;
-  modal(`${esc(number)} numaralı oda`, `<div class="room-detail-summary"><span class="room-status ${esc(room?.[2]||'')}">${esc(room?.[1]||'')}</span><span>${esc(room?.[3]||'')}</span><button class="room-issue-button" data-action="report-room-issue" data-room="${esc(number)}">△ Sorun bildir</button></div><section class="room-detail-section"><h3>Misafir talepleri <b>${allRequests.length}</b></h3>${list(allRequests,'Misafir talebi yok.','request')}</section><section class="room-detail-section"><h3>Sorunlar <b>${allIssues.length}</b></h3>${list(allIssues,'Sorun kaydı yok.','issue')}</section>`, 'roomDetailsModal');
+  modal(`${esc(number)} numaralı oda`, `<div class="room-detail-summary"><span class="room-status ${esc(room?.[2]||'')}">${esc(room?.[1]||'')}</span><span>${esc(room?.[3]||'')}</span><button class="room-issue-button" data-action="report-room-issue" data-room="${esc(number)}">△ Sorun bildir</button></div>${stayDetailSection(room?.[6],room?.[7],room?.[8],room?.[9],room?.[10])}<section class="room-detail-section"><h3>Misafir talepleri <b>${allRequests.length}</b></h3>${list(allRequests,'Misafir talebi yok.','request')}</section><section class="room-detail-section"><h3>Sorunlar <b>${allIssues.length}</b></h3>${list(allIssues,'Sorun kaydı yok.','issue')}</section>`, 'roomDetailsModal');
 }
-function roomsView(){ const visibleRooms=rooms.filter(([number,,key,floor])=>(roomFloorFilter==='all'||floor===roomFloorFilter)&&(roomStatusFilter==='all'||key===roomStatusFilter)); const floors=[...new Set(rooms.map(([, , ,floor])=>floor))]; const filterBody=`<div class="room-filter-modal"><div class="filter-modal-group"><strong>Kat</strong><div class="filter-modal-options"><button class="filter ${roomFloorFilter==='all'?'active':''}" data-room-floor="all">Tüm katlar</button>${floors.map(floor=>`<button class="filter ${roomFloorFilter===floor?'active':''}" data-room-floor="${esc(floor)}">${esc(floor)}</button>`).join('')}</div></div></div>`; const statusOptions=Object.entries(labels).map(([key,label])=>`<option value="${key}" ${roomStatusFilter===key?'selected':''}>${label}</option>`).join(''); return `<div class="page-heading room-page-heading"><div><p class="eyebrow">Operasyon / Odalar</p><h1>Odalar</h1></div></div><div class="room-toolbar"><span class="panel-meta">${visibleRooms.length} oda gösteriliyor</span><div class="room-toolbar-actions"><select class="room-status-select" data-room-status-select aria-label="Oda durumuna göre filtrele"><option value="all" ${roomStatusFilter==='all'?'selected':''}>Tüm durumlar</option>${statusOptions}</select><button class="filter-open-button" data-action="open-room-filters">☷ Kat filtresi</button>${currentRole==='admin'?'<button class="filter-open-button" data-action="bulk-rooms">＋ Toplu oda ekle</button>':''}</div></div><section class="panel room-panel"><div class="rooms-grid">${visibleRooms.length?roomCards(visibleRooms):'<p class="empty-state">Bu filtrelerde oda bulunmuyor.</p>'}</div></section><div class="room-filter-template" hidden>${filterBody}</div>`; }
+function roomsView(){
+  const visibleRooms=rooms.filter(([number,,key,floor,,,,,,checkinDate,checkoutDate])=>(roomFloorFilter==='all'||floor===roomFloorFilter)&&(roomStatusFilter==='all'||key===roomStatusFilter)&&(roomCheckoutFilter!=='today'||isCheckoutToday(checkoutDate)));
+  const floors=[...new Set(rooms.map(([, , ,floor])=>floor))];
+  const todayCheckoutCount=rooms.filter(room=>isCheckoutToday(room[10])).length;
+  const filterBody=`<div class="room-filter-modal"><div class="filter-modal-group"><strong>Kat</strong><div class="filter-modal-options"><button class="filter ${roomFloorFilter==='all'?'active':''}" data-room-floor="all">Tüm katlar</button>${floors.map(floor=>`<button class="filter ${roomFloorFilter===floor?'active':''}" data-room-floor="${esc(floor)}">${esc(floor)}</button>`).join('')}</div></div></div>`;
+  const statusOptions=Object.entries(labels).map(([key,label])=>`<option value="${key}" ${roomStatusFilter===key?'selected':''}>${label}</option>`).join('');
+  return `<div class="page-heading room-page-heading"><div><p class="eyebrow">Operasyon / Odalar</p><h1>Odalar</h1></div></div><div class="room-toolbar"><span class="panel-meta">${visibleRooms.length} oda gösteriliyor</span><div class="room-toolbar-actions"><select class="room-status-select" data-room-status-select aria-label="Oda durumuna göre filtrele"><option value="all" ${roomStatusFilter==='all'?'selected':''}>Tüm durumlar</option>${statusOptions}</select><button class="filter-open-button ${roomCheckoutFilter==='today'?'active':''}" data-action="toggle-checkout-filter">🧳 Bugün çıkış yapacaklar${todayCheckoutCount?` (${todayCheckoutCount})`:''}</button><button class="filter-open-button" data-action="open-room-filters">☷ Kat filtresi</button>${currentRole==='admin'?'<button class="filter-open-button" data-action="bulk-rooms">＋ Toplu oda ekle</button>':''}</div></div><section class="panel room-panel"><div class="rooms-grid">${visibleRooms.length?roomCards(visibleRooms):'<p class="empty-state">Bu filtrelerde oda bulunmuyor.</p>'}</div></section><div class="room-filter-template" hidden>${filterBody}</div>`;
+}
 function render(view=currentView){
   if (!canAccess(view)) view='dashboard';
   currentView=view;
@@ -296,6 +342,7 @@ document.addEventListener('click',(event)=>{
   const floorButton=event.target.closest('[data-room-floor]'); if(floorButton){roomFloorFilter=floorButton.dataset.roomFloor;closeModal();render('rooms');return;}
   const statusButton=event.target.closest('[data-room-status]'); if(statusButton){roomStatusFilter=statusButton.dataset.roomStatus;closeModal();render('rooms');return;}
   const action=event.target.closest('[data-action]')?.dataset.action; if(!action)return;
+  if(action==='toggle-checkout-filter'){ roomCheckoutFilter = roomCheckoutFilter==='today' ? 'all' : 'today'; render('rooms'); return; }
   if(action==='open-room-filters'){const template=document.querySelector('.room-filter-template');if(template)modal('Oda filtreleri',template.innerHTML);return;}
   if(action==='bulk-rooms'){if(currentRole!=='admin'){showToast('Toplu oda ekleme yalnızca admin içindir.');return;} modal('Toplu oda ekle',bulkRoomForm());return;}
   if(action==='room-details'){roomDetails(event.target.closest('[data-room]')?.dataset.room);return;}
@@ -370,9 +417,10 @@ document.addEventListener('submit',(event)=>{
     const id=data.roomNumber; const key=data.statusKey;
     const room=[id,labels[key],key,data.floor,data.roomType||'Standart'];
     const old=rooms.find(item=>item[0]===id);
-    // Eklentiden gelen doluluk/misafir bilgilerini KORU: bu formda bu alanlar
-    // yok, writeRecord() .set() kullandığı için eklemezsek eski veriler silinir.
-    const preserved = old ? { occupied: Boolean(old[5]), guestName: old[6]||null, agency: old[7]||null, paxInfo: old[8]||null } : {};
+    // Eklentiden gelen doluluk/misafir/giriş-çıkış bilgilerini KORU: bu formda
+    // bu alanlar yok, writeRecord() .set() kullandığı için eklemezsek eski
+    // veriler silinir.
+    const preserved = old ? { occupied: Boolean(old[5]), guestName: old[6]||null, agency: old[7]||null, paxInfo: old[8]||null, checkinDate: old[9]||null, checkoutDate: old[10]||null } : {};
     writeRecord('rooms',id,{roomNumber:id,status:room[1],statusKey:key,floor:data.floor,roomType:data.roomType,...preserved}).then(()=>{if(old){old[1]=room[1];old[2]=room[2];old[3]=room[3];old[4]=room[4];}else rooms.push(room);return key==='dirty'?removeCompletedRequestsForRoom(id):null;}).then(()=>{closeModal();render('rooms');showToast('Oda Firebase\'e kaydedildi.');}).catch(()=>showToast('Oda kaydedilemedi.'));
     return;
   }
