@@ -275,15 +275,34 @@ function roomOccupancyLine(occupied, guestName, agency, paxInfo){
 // --- Giriş/Çıkış tarihi ayrıştırma ve "bugün çıkış" kontrolü ---
 // ElektraWeb tarihleri genellikle "gg.aa.yyyy" (bazen saat eklenmiş) formatında
 // geliyor. Farklı bir format kullanılıyorsa (örn. "gg/aa/yyyy") da destekleniyor.
+// Eklenti artik tarihleri Turkce ay adiyla ("11 Eyl 2026") yaziyor, sayisal
+// "gg.aa.yyyy" formatiyla degil - bu yuzden ikisini de tanimamiz gerekiyor.
+const TR_MONTH_INDEX = { oca:0, sub:1, 'şub':1, mar:2, nis:3, may:4, haz:5, tem:6, agu:7, 'ağu':7, eyl:8, eki:9, kas:10, ara:11 };
 function parseElektraDate(value){
   if (!value) return null;
-  const datePart = String(value).trim().split(' ')[0];
-  const match = datePart.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})$/);
-  if (!match) return null;
-  let [, day, month, year] = match;
-  if (year.length === 2) year = `20${year}`;
-  const date = new Date(Number(year), Number(month) - 1, Number(day));
-  return Number.isNaN(date.getTime()) ? null : date;
+  const raw = String(value).trim();
+
+  // Format 1: "gg.aa.yyyy" veya "gg/aa/yyyy" (saat eklenmis olabilir)
+  const numericMatch = raw.split(' ')[0].match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})$/);
+  if (numericMatch) {
+    let [, day, month, year] = numericMatch;
+    if (year.length === 2) year = `20${year}`;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  // Format 2: "11 Eyl 2026" (Turkce kisaltilmis ay adi)
+  const trMatch = raw.match(/^(\d{1,2})\s+([A-Za-zÇĞİÖŞÜçğıöşü]+)\.?\s+(\d{4})$/);
+  if (trMatch) {
+    const [, day, monthName, year] = trMatch;
+    const monthKey = monthName.toLocaleLowerCase('tr-TR').replace(/[^a-zçğıöşü]/g, '').slice(0, 3);
+    const monthIndex = TR_MONTH_INDEX[monthKey];
+    if (monthIndex === undefined) return null;
+    const date = new Date(Number(year), monthIndex, Number(day));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
 }
 function isSameDay(a, b){
   return Boolean(a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate());
