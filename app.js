@@ -353,12 +353,13 @@ function ensureRoomsPrintStyles(){
     #roomsPrintArea .rooms-print-table th, #roomsPrintArea .rooms-print-table td { border: 1px solid #cfd8d6; padding: 4px 6px; text-align: left; font-size: 12px; }
     #roomsPrintArea .rooms-print-table thead th { background: #f2f5f4; }
     @media print {
-      @page { size: A4 landscape; margin: 8mm; }
+      @page { size: A4 portrait; margin: 8mm; }
       body * { visibility: hidden !important; }
       #roomsPrintArea, #roomsPrintArea * { visibility: visible !important; }
       #roomsPrintArea { position: absolute; top: 0; left: 0; }
-      #roomsPrintArea .rooms-print-table { font-size: 9px; }
-      #roomsPrintArea .rooms-print-table th, #roomsPrintArea .rooms-print-table td { padding: 2px 4px; }
+      #roomsPrintArea .rooms-print-table { font-size: 8px; }
+      #roomsPrintArea .rooms-print-table th, #roomsPrintArea .rooms-print-table td { padding: 2px 3px; word-break: break-word; }
+      #roomsPrintArea .rooms-print-header { font-size: 10px !important; }
       #roomsPrintArea .rooms-print-table thead { display: table-header-group; }
       #roomsPrintArea .rooms-print-table tr { page-break-inside: avoid; }
     }
@@ -369,17 +370,23 @@ function printRoomsList(){
   const area = document.getElementById('roomsPrintArea');
   if (!area) return;
   ensureRoomsPrintStyles();
-  // Odalar tek sayfaya sigsin diye: icerik yuksekligi A4 yatay sayfanin
-  // kullanilabilir yuksekliginden buyukse tabloyu orantili olarak kucult
-  // (transform: scale). Bu bir yaklasik hesaptir; cok fazla oda/talep/sorun
-  // varsa yine de ikinci sayfaya tasabilir - bu durumda yazdirma
-  // penceresindeki "Olcek" ayarindan manuel kucultme yapilabilir.
+  // Odalar TEK DIKEY (A4 portrait) sayfaya sigsin diye: icerigin hem
+  // GENISLIGI hem YUKSEKLIGI, sayfanin kullanilabilir alanindan buyukse,
+  // ikisinden gereken en kucuk oranda tabloyu kucultuyoruz (transform:
+  // scale). Bu yaklasik bir hesaptir; asiri fazla oda/talep/sorun varsa
+  // yine de ikinci sayfaya tasabilir - bu durumda yazdirma penceresindeki
+  // "Olcek" ayarindan manuel kucultme yapilabilir.
   area.style.transform = 'none';
   area.style.width = '';
-  const pageHeightPx = (210 - 16) * (96 / 25.4); // A4 kisa kenar (yatayda yukseklik) - 8mm*2 kenar bosluğu, 96dpi
+  const marginMm = 8;
+  const pageWidthPx = (210 - marginMm * 2) * (96 / 25.4); // A4 dikey genislik (210mm)
+  const pageHeightPx = (297 - marginMm * 2) * (96 / 25.4); // A4 dikey yukseklik (297mm)
+  const contentWidth = area.scrollWidth;
   const contentHeight = area.scrollHeight;
-  if (contentHeight > pageHeightPx) {
-    const scale = Math.max(0.35, pageHeightPx / contentHeight);
+  const widthScale = contentWidth > pageWidthPx ? pageWidthPx / contentWidth : 1;
+  const heightScale = contentHeight > pageHeightPx ? pageHeightPx / contentHeight : 1;
+  const scale = Math.max(0.3, Math.min(widthScale, heightScale, 1));
+  if (scale < 1) {
     area.style.transform = `scale(${scale})`;
     area.style.transformOrigin = 'top left';
     area.style.width = `${(100 / scale).toFixed(2)}%`;
