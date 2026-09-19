@@ -6,7 +6,10 @@
 
 - `PUSH_API_SECRET`: Endpoint Bearer secret. Sadece backend ortamında tutulur.
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: Firebase Admin service-account JSON'u. Frontend'e eklenmez.
+- `FIREBASE_SERVICE_ACCOUNT_BASE64`: Alternatif olarak service-account JSON'unun Base64 kodlanmış hali. JSON değişkeninde satır sonu sorunu yaşanırsa bunu kullanın.
 - `FIREBASE_DATABASE_URL`: İsteğe bağlı; varsayılan proje database URL'sidir.
+
+`FIREBASE_SERVICE_ACCOUNT_JSON` içindeki `private_key` alanında gerçek satır sonları yerine `\\n` bulunması desteklenir. Değişkenleri Vercel'de **Production** ortamına ekledikten sonra yeni deployment yapılmalıdır.
 
 ## Firebase data contract
 

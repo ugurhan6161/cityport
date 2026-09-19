@@ -4,8 +4,28 @@ const TIME_ZONE = 'Europe/Istanbul';
 const DATABASE_URL = process.env.FIREBASE_DATABASE_URL || 'https://hotelss-5d21e-default-rtdb.firebaseio.com';
 
 function getServiceAccount() {
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON tanımlı değil.');
-  return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  if (!raw) {
+    const error = new Error('Firebase servis hesabı tanımlı değil.');
+    error.code = 'config/missing-service-account';
+    throw error;
+  }
+
+  try {
+    const json = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64
+      ? Buffer.from(raw, 'base64').toString('utf8')
+      : raw;
+    const serviceAccount = JSON.parse(json);
+    if (typeof serviceAccount.private_key === 'string') {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+    return serviceAccount;
+  } catch (error) {
+    const configError = new Error('Firebase servis hesabı JSON olarak okunamadı.');
+    configError.code = 'config/invalid-service-account';
+    configError.cause = error;
+    throw configError;
+  }
 }
 
 function getDatabase() {
@@ -182,6 +202,9 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     console.error('Push gönderimi başarısız:', error);
     const status = error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error' || error.message === 'Unauthorized' ? 401 : error.message === 'Admin yetkisi gerekli.' ? 403 : 500;
-    return res.status(status).json({ error: status === 401 ? 'Oturum doğrulanamadı.' : status === 403 ? 'Admin yetkisi gerekli.' : 'Push gönderimi başarısız.' });
+    const errorMessage = error.code?.startsWith('config/')
+      ? 'Push servisi yapılandırılmamış. Vercel ortam değişkenlerini kontrol edin.'
+      : 'Push gönderimi başarısız.';
+    return res.status(status).json({ error: errorMessage });
   }
 };
