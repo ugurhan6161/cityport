@@ -32,6 +32,12 @@
       "$requestId": {
         ".write": "auth != null"
       }
+    },
+    "manual_notification_logs": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+      "$notificationId": {
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+      }
     }
   }
 }

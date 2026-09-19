@@ -28,3 +28,15 @@ Gönderim kaydı `push_send_logs/{checkoutDate}/{room}` altında tutulur. Aynı 
 ```
 
 `room` gönderilmezse endpoint bugün checkout olan tüm aktif odaları tarar. Scheduler genellikle body göndermeden endpoint'i çağırabilir; varsayılan iki dilli mesaj üretilir. Backend Firebase Admin SDK ile FCM'e gönderir; `VAPID_PRIVATE_KEY` ve `VAPID_SUBJECT` kullanılmaz.
+
+Admin kullanıcıları aynı endpoint'i Firebase ID token ile çağırarak manuel bildirim gönderebilir. Bu çağrı `PUSH_API_SECRET` kullanmaz; backend token içindeki kullanıcıyı ve Firebase `users/{uid}.role == admin` kaydını doğrular:
+
+```json
+{
+  "manual": true,
+  "room": "502",
+  "title": "Cityport Hotel",
+  "body": "Odanızla ilgili önemli bir duyuru var.",
+  "url": "/"
+}
+```
