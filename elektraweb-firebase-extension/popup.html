@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Oda Senkronizasyonu</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main class="popup">
+    <header>
+      <div class="brand-mark">OH</div>
+      <div><strong>Oda senkronizasyonu</strong><span>ElektraWEB → Firebase</span></div>
+    </header>
+    <p id="status" class="status">Kontrol ediliyor...</p>
+    <label class="toggle-row"><span>Otomatik senkronizasyon</span><input id="enabled" type="checkbox" checked /><i></i></label>
+    <section id="loginSection">
+      <h1>Firebase hesabı</h1>
+      <p class="hint">Firebase Rules ile yetkili bir personel hesabı kullanın.</p>
+      <label>E-posta<input id="email" type="email" autocomplete="username" placeholder="personel@otel.com" /></label>
+      <label>Şifre<input id="password" type="password" autocomplete="current-password" /></label>
+      <button id="login" class="primary">Giriş yap</button>
+    </section>
+    <section id="sessionSection" hidden>
+      <p class="signed-in">Firebase bağlantısı aktif.</p>
+      <button id="logout" class="secondary">Çıkış yap</button>
+    </section>
+    <p id="lastSync" class="last-sync"></p>
+    <p id="diagnostics" class="diagnostics"></p>
+    <p id="error" class="error" role="alert"></p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

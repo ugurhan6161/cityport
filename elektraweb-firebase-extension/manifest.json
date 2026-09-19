@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "ElektraWEB Oda Durumu Firebase Senkronizasyonu",
+  "version": "1.0.1",
+  "description": "ElektraWEB Room Rack oda durumlarını Firebase oda kayıtlarına aktarır.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://hotelss-5d21e-default-rtdb.firebaseio.com/*"
+  ],
+  "action": {
+    "default_title": "Oda durumu senkronizasyonu",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
