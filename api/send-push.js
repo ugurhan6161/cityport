@@ -16,11 +16,17 @@ function getServiceAccount() {
       ? Buffer.from(raw, 'base64').toString('utf8')
       : raw;
     const serviceAccount = JSON.parse(json);
+    if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+      const configError = new Error('Firebase servis hesabı alanları eksik.');
+      configError.code = 'config/incomplete-service-account';
+      throw configError;
+    }
     if (typeof serviceAccount.private_key === 'string') {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
     return serviceAccount;
   } catch (error) {
+    if (error.code?.startsWith('config/')) throw error;
     const configError = new Error('Firebase servis hesabı JSON olarak okunamadı.');
     configError.code = 'config/invalid-service-account';
     configError.cause = error;
@@ -201,10 +207,20 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, timezone: TIME_ZONE, checkoutDate, results });
   } catch (error) {
     console.error('Push gönderimi başarısız:', error);
-    const status = error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error' || error.message === 'Unauthorized' ? 401 : error.message === 'Admin yetkisi gerekli.' ? 403 : 500;
-    const errorMessage = error.code?.startsWith('config/')
+    const code = String(error.code || '');
+    const status = code.startsWith('auth/') || error.message === 'Unauthorized'
+      ? 401
+      : error.message === 'Admin yetkisi gerekli.'
+        ? 403
+        : 500;
+    const errorMessage = code.startsWith('config/')
       ? 'Push servisi yapılandırılmamış. Vercel ortam değişkenlerini kontrol edin.'
-      : 'Push gönderimi başarısız.';
-    return res.status(status).json({ error: errorMessage });
+      : status === 401
+        ? 'Oturum doğrulanamadı. Sayfayı yenileyip tekrar deneyin.'
+        : status === 403
+          ? 'Admin yetkisi gerekli.'
+          : 'Push gönderimi başarısız.';
+    const errorType = code.startsWith('config/') ? code : code || 'internal-error';
+    return res.status(status).json({ error: errorMessage, errorType });
   }
 };
