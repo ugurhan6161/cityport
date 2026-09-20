@@ -33,6 +33,13 @@
         ".write": "auth != null"
       }
     },
+    "cafe_products": {
+      ".read": "auth != null",
+      "$productId": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'front_desk')",
+        ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('price').isNumber() && newData.child('price').val() >= 0 && newData.child('category').isString() && newData.child('active').isBoolean() && newData.child('sortOrder').isNumber() && newData.child('createdAt').exists() && newData.child('updatedAt').exists())"
+      }
+    },
     "manual_notification_logs": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
       "$notificationId": {
