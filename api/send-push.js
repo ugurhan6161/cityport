@@ -6,6 +6,14 @@ const DATABASE_URL = process.env.FIREBASE_DATABASE_URL || 'https://hotelss-5d21e
 function getServiceAccount() {
   const encoded = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
   const raw = encoded || process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const separateFields = {
+    project_id: process.env.FIREBASE_PROJECT_ID,
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    private_key: process.env.FIREBASE_PRIVATE_KEY
+  };
+  if (Object.values(separateFields).every(Boolean)) {
+    return { type: 'service_account', ...separateFields, private_key: separateFields.private_key.replace(/\\n/g, '\n') };
+  }
   if (!raw) {
     const error = new Error('Firebase servis hesabı tanımlı değil.');
     error.code = 'config/missing-service-account';

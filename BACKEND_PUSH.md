@@ -7,6 +7,7 @@
 - `PUSH_API_SECRET`: Endpoint Bearer secret. Sadece backend ortamında tutulur.
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: Firebase Admin service-account JSON'u. Frontend'e eklenmez.
 - `FIREBASE_SERVICE_ACCOUNT_BASE64`: Alternatif olarak service-account JSON'unun Base64 kodlanmış hali. JSON değişkeninde satır sonu sorunu yaşanırsa bunu kullanın.
+- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`: JSON yapıştırmak sorun çıkarırsa servis hesabını üç ayrı değişken olarak tanımlamak için alternatif yöntem.
 - `FIREBASE_DATABASE_URL`: İsteğe bağlı; varsayılan proje database URL'sidir.
 
 `FIREBASE_SERVICE_ACCOUNT_JSON` içindeki `private_key` alanında gerçek satır sonları yerine `\\n` bulunması desteklenir. Değişkenleri Vercel'de **Production** ortamına ekledikten sonra yeni deployment yapılmalıdır.
@@ -20,7 +21,7 @@ Kurulum:
 
 Değer `FIREBASE_SERVICE_ACCOUNT_JSON` alanına yapıştırılırken dosyanın tamamı `{` ile başlayıp `}` ile bitmelidir. Dosyayı açıp sadece `private_key` değerini veya dosya yolunu yapıştırmayın. En sorunsuz yöntem, JSON dosyasını bir metin editöründe açıp tamamını kopyalamaktır.
 
-Servis hesabı JSON'unu GitHub'a, frontend dosyalarına veya tarayıcı konsoluna koymayın. JSON yapıştırılamıyorsa dosyayı Base64 kodlayıp `FIREBASE_SERVICE_ACCOUNT_BASE64` değişkenini kullanabilirsiniz.
+Servis hesabı JSON'unu GitHub'a, frontend dosyalarına veya tarayıcı konsoluna koymayın. JSON yapıştırılamıyorsa şu üç Production değişkenini kullanabilirsiniz: `FIREBASE_PROJECT_ID` değerine `project_id`, `FIREBASE_CLIENT_EMAIL` değerine `client_email`, `FIREBASE_PRIVATE_KEY` değerine `private_key` alanının tamamını yapıştırın. `private_key` içindeki `\\n` karakterlerini silmeyin.
 
 ## Firebase data contract
 
