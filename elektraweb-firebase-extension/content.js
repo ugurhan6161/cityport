@@ -77,20 +77,17 @@
       if (!roomNumber || !status) { skipped += 1; return; }
 
       // Oda dolu mu boş mu: dolu odalarda misafir bilgisi (.inHouseResGuest)
-      // ve konteynerde "inhouseguest" class'ı bulunuyor. Gizlilik için
-      // misafir ADI gönderilmiyor, sadece dolu/boş bilgisi (boolean) gönderiliyor.
+      // ve konteynerde "inhouseguest" class'ı bulunuyor.
       const occupied = isRoomOccupied(roomCard);
-      // Misafir adını da göndermek isterseniz aşağıdaki satırı açıp
-      // sendMessage içine "guestName" olarak ekleyebilirsiniz:
-      // const guestName = getGuestName(roomCard);
+      const guestName = getGuestName(roomCard);
 
       matched += 1;
-      const key = `${roomNumber}:${status}:${occupied}`;
+      const key = `${roomNumber}:${status}:${occupied}:${guestName || ''}`;
       if (seen.get(roomNumber) === key) return;
       seen.set(roomNumber, key);
 
       try {
-        chrome.runtime.sendMessage({ type: 'sync-room-status', roomNumber, status, occupied }, response => {
+        chrome.runtime.sendMessage({ type: 'sync-room-status', roomNumber, status, occupied, guestName }, response => {
           if (chrome.runtime.lastError) {
             console.warn('[Oda senkronizasyonu] mesaj hatası:', chrome.runtime.lastError.message);
           } else if (!response?.ok) {
@@ -136,9 +133,6 @@
     return Boolean(roomCard.querySelector('.rr-room-guest-info.inhouseguest, .inHouseResGuest'));
   }
 
-  // İsteğe bağlı: misafir adını okumak isterseniz bu fonksiyonu kullanıp
-  // sonucu sendMessage'a "guestName" olarak ekleyebilirsiniz. Varsayılan
-  // olarak kullanılmıyor (gizlilik nedeniyle Firebase'e gönderilmiyor).
   function getGuestName(roomCard) {
     return roomCard.querySelector('.inHouseResGuest')?.textContent?.replace(/\s+/g, ' ').trim() || null;
   }

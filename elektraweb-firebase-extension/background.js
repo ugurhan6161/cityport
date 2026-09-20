@@ -14,7 +14,7 @@ const STATUS_KEYS = {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'sync-room-status') {
-    syncRoomStatus(message.roomNumber, message.status, message.occupied, sender.tab?.url)
+    syncRoomStatus(message.roomNumber, message.status, message.occupied, message.guestName, sender.tab?.url)
       .then(() => sendResponse({ ok: true }))
       .catch(async error => {
         console.error('[Oda senkronizasyonu] sync hatası:', error);
@@ -85,7 +85,7 @@ async function getFreshIdToken(state, config) {
   return newSession.idToken;
 }
 
-async function syncRoomStatus(roomNumber, status, occupied, sourceUrl) {
+async function syncRoomStatus(roomNumber, status, occupied, guestName, sourceUrl) {
   const state = await chrome.storage.local.get(['session', 'enabled', 'config']);
   if (state.enabled === false) return;
 
@@ -107,9 +107,9 @@ async function syncRoomStatus(roomNumber, status, occupied, sourceUrl) {
     roomNumber: roomId,
     status: displayStatus(statusKey),
     statusKey,
-    // Dolu/boş bilgisi: misafir adı gönderilmez, sadece boolean + Türkçe etiket.
     occupied: isOccupied,
     occupancy: isOccupied ? 'Dolu' : 'Boş',
+    guestName: isOccupied ? String(guestName || '').trim() || null : null,
     floor: existing.floor || 'ElektraWEB',
     updatedAt: { '.sv': 'timestamp' },
     updatedBy: state.session.localId || null,

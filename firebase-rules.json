@@ -12,29 +12,50 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
     },
     "rooms": {
-      ".read": "auth != null",
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() != null",
       "$roomId": {
         ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'supervisor' || root.child('users').child(auth.uid).child('role').val() == 'housekeeper' || root.child('users').child(auth.uid).child('role').val() == 'front_desk')"
       }
     },
     "room_status_logs": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() != null"
     },
     "issues": {
-      ".read": "auth != null",
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() != null",
       "$issueId": {
-        ".write": "auth != null"
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'supervisor' || root.child('users').child(auth.uid).child('role').val() == 'maintenance' || root.child('users').child(auth.uid).child('role').val() == 'front_desk' || root.child('users').child(auth.uid).child('role').val() == 'housekeeper')"
       }
     },
     "guest_requests": {
-      ".read": "auth != null",
+      ".indexOn": ["roomNumber", "createdAt"],
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() != null",
       "$requestId": {
-        ".write": "auth != null"
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'supervisor' || root.child('users').child(auth.uid).child('role').val() == 'housekeeper' || root.child('users').child(auth.uid).child('role').val() == 'front_desk')"
       }
     },
+    "cleaning_requests": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() != null",
+      "$requestId": {
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() != null"
+      }
+    },
+    "reviews": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
+      "$reviewId": {
+        ".write": false
+      }
+    },
+    "hotel_info": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+    },
+    "tours": {
+      ".read": true,
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
+    },
     "cafe_products": {
-      ".read": "auth != null",
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() != null",
       "$productId": {
         ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'front_desk')",
         ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('price').isNumber() && newData.child('price').val() >= 0 && newData.child('category').isString() && newData.child('active').isBoolean() && newData.child('sortOrder').isNumber() && newData.child('createdAt').exists() && newData.child('updatedAt').exists())"
