@@ -29,6 +29,8 @@ Rezervasyonlar `reservations` altında tutulur. Her kayıt `room` veya `roomNumb
 
 Firebase Cloud Messaging registration token'ları oda bazında `fcmTokens/{room}/{id}`, `fcm_tokens/{room}/{id}` veya `pushTokens/{room}/{id}` altında `{ "token": "...", "active": true }` olarak tutulabilir. Misafir uygulamasının kullandığı format olan `push_subscriptions/{id}` altındaki `{ "token": "...", "roomNumber": "502" }` kayıtları da desteklenir. String token değeri de desteklenir. Geçersiz ya da süresi dolmuş FCM token'ları `active: false` yapılır.
 
+Gönderim data-only FCM mesajı olarak yapılır; misafir uygulamasının service worker'ı bildirimi tek kez gösterir. Başlık `Cityport Hotel` olarak sabitlenmiştir.
+
 Gönderim kaydı `push_send_logs/{checkoutDate}/{room}` altında tutulur. Aynı tarih ve oda kaydı varsa ikinci gönderim yapılmaz. Kayıtta `room`, `checkoutDate`, `sentAt` ve `result` alanları bulunur.
 
 ## Request

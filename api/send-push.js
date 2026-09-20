@@ -105,7 +105,7 @@ function tokensForRoom(root, room) {
 function messageFor(room, hotelName = 'Cityport Hotel') {
   return {
     room,
-    title: hotelName,
+    title: 'Cityport Hotel',
     body: 'TR: Bugün çıkış gününüz. Lütfen odanızı saat 12:00\'ye kadar boşaltmanız ricadır.\n\nEN: Today is your checkout day. Please vacate your room by 12:00.',
     url: '/'
   };
@@ -136,8 +136,7 @@ async function sendForRoom(db, root, room, checkoutDate, request) {
     const batch = tokens.slice(index, index + 500);
     const response = await admin.messaging().sendEachForMulticast({
       tokens: batch.map(entry => entry.token),
-      notification: { title: message.title, body: message.body },
-      data: { room: String(room), checkoutDate, url: message.url || '/' },
+      data: { title: 'Cityport Hotel', body: String(message.body), room: String(room), checkoutDate, url: message.url || '/' },
       webpush: { fcmOptions: { link: message.url || '/' } }
     });
     response.responses.forEach((delivery, deliveryIndex) => {
@@ -169,8 +168,7 @@ async function sendManualForRoom(db, root, room, request, senderUid) {
     const batch = tokens.slice(index, index + 500);
     const response = await admin.messaging().sendEachForMulticast({
       tokens: batch.map(entry => entry.token),
-      notification: { title: message.title, body: message.body },
-      data: { room: String(room), type: 'manual', url: message.url || '/' },
+      data: { title: 'Cityport Hotel', body: String(message.body), room: String(room), type: 'manual', url: message.url || '/' },
       webpush: { fcmOptions: { link: message.url || '/' } }
     });
     response.responses.forEach((delivery, deliveryIndex) => {
