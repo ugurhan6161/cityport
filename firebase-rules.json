@@ -12,7 +12,7 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'"
     },
     "rooms": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() != null",
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'supervisor' || root.child('users').child(auth.uid).child('role').val() == 'housekeeper' || root.child('users').child(auth.uid).child('role').val() == 'front_desk')",
       "$roomId": {
         ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'supervisor' || root.child('users').child(auth.uid).child('role').val() == 'housekeeper' || root.child('users').child(auth.uid).child('role').val() == 'front_desk')"
       }
