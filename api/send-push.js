@@ -4,7 +4,8 @@ const TIME_ZONE = 'Europe/Istanbul';
 const DATABASE_URL = process.env.FIREBASE_DATABASE_URL || 'https://hotelss-5d21e-default-rtdb.firebaseio.com';
 
 function getServiceAccount() {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  const encoded = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  const raw = encoded || process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) {
     const error = new Error('Firebase servis hesabı tanımlı değil.');
     error.code = 'config/missing-service-account';
@@ -12,10 +13,11 @@ function getServiceAccount() {
   }
 
   try {
-    const json = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64
-      ? Buffer.from(raw, 'base64').toString('utf8')
-      : raw;
-    const serviceAccount = JSON.parse(json);
+    const json = encoded
+      ? Buffer.from(encoded, 'base64').toString('utf8')
+      : raw.trim().replace(/^\uFEFF/, '');
+    let serviceAccount = JSON.parse(json);
+    if (typeof serviceAccount === 'string') serviceAccount = JSON.parse(serviceAccount);
     if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
       const configError = new Error('Firebase servis hesabı alanları eksik.');
       configError.code = 'config/incomplete-service-account';
@@ -214,7 +216,7 @@ module.exports = async function handler(req, res) {
         ? 403
         : 500;
     const errorMessage = code.startsWith('config/')
-      ? 'Push servisi yapılandırılmamış. Vercel ortam değişkenlerini kontrol edin.'
+      ? 'Firebase servis hesabı eksik. Vercel\'de FIREBASE_SERVICE_ACCOUNT_JSON veya FIREBASE_SERVICE_ACCOUNT_BASE64 tanımlayın.'
       : status === 401
         ? 'Oturum doğrulanamadı. Sayfayı yenileyip tekrar deneyin.'
         : status === 403

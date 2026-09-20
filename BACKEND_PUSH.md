@@ -11,6 +11,17 @@
 
 `FIREBASE_SERVICE_ACCOUNT_JSON` içindeki `private_key` alanında gerçek satır sonları yerine `\\n` bulunması desteklenir. Değişkenleri Vercel'de **Production** ortamına ekledikten sonra yeni deployment yapılmalıdır.
 
+Kurulum:
+
+1. Firebase Console > Project settings > Service accounts > **Generate new private key** ile JSON dosyasını indirin.
+2. Vercel Project > Settings > Environment Variables bölümünde `FIREBASE_SERVICE_ACCOUNT_JSON` adında yeni değişken oluşturun.
+3. JSON dosyasının tamamını tek değer olarak yapıştırın ve en az **Production** ortamını seçin.
+4. Vercel'de **Redeploy** yapın. Ortam değişkenleri yeni deployment'tan önce çalışan fonksiyona uygulanmaz.
+
+Değer `FIREBASE_SERVICE_ACCOUNT_JSON` alanına yapıştırılırken dosyanın tamamı `{` ile başlayıp `}` ile bitmelidir. Dosyayı açıp sadece `private_key` değerini veya dosya yolunu yapıştırmayın. En sorunsuz yöntem, JSON dosyasını bir metin editöründe açıp tamamını kopyalamaktır.
+
+Servis hesabı JSON'unu GitHub'a, frontend dosyalarına veya tarayıcı konsoluna koymayın. JSON yapıştırılamıyorsa dosyayı Base64 kodlayıp `FIREBASE_SERVICE_ACCOUNT_BASE64` değişkenini kullanabilirsiniz.
+
 ## Firebase data contract
 
 Rezervasyonlar `reservations` altında tutulur. Her kayıt `room` veya `roomNumber`, `checkoutDate` (`YYYY-MM-DD`) ve isteğe bağlı `status`/`active` alanları içerebilir. `cancelled`, `completed`, `checked_out` ve `closed` kayıtları aktif sayılmaz.
