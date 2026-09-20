@@ -94,7 +94,11 @@ function tokenOf(value, id) {
 
 function tokensForRoom(root, room) {
   const candidates = [root.fcmTokens?.[room], root.fcm_tokens?.[room], root.pushTokens?.[room]];
-  return candidates.flatMap(records).map(([id, value]) => tokenOf(value, id)).filter(Boolean)
+  const subscriptions = Object.entries(root.push_subscriptions || {})
+    .filter(([, value]) => String(value?.roomNumber || '').trim() === String(room).trim())
+    .map(([id, value]) => [id, value]);
+  return [...candidates.flatMap(records), ...subscriptions]
+    .map(([id, value]) => tokenOf(value, id)).filter(Boolean)
     .filter((entry, index, list) => list.findIndex(item => item.token === entry.token) === index);
 }
 
@@ -187,7 +191,8 @@ async function markTokenInactive(db, room, id) {
   await Promise.all([
     db.ref(`fcmTokens/${room}/${id}/active`).set(false),
     db.ref(`fcm_tokens/${room}/${id}/active`).set(false),
-    db.ref(`pushTokens/${room}/${id}/active`).set(false)
+    db.ref(`pushTokens/${room}/${id}/active`).set(false),
+    db.ref(`push_subscriptions/${id}/active`).set(false)
   ]);
 }
 

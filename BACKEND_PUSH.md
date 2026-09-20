@@ -27,7 +27,7 @@ Servis hesabı JSON'unu GitHub'a, frontend dosyalarına veya tarayıcı konsolun
 
 Rezervasyonlar `reservations` altında tutulur. Her kayıt `room` veya `roomNumber`, `checkoutDate` (`YYYY-MM-DD`) ve isteğe bağlı `status`/`active` alanları içerebilir. `cancelled`, `completed`, `checked_out` ve `closed` kayıtları aktif sayılmaz.
 
-Firebase Cloud Messaging registration token'ları oda bazında `fcmTokens/{room}/{id}`, `fcm_tokens/{room}/{id}` veya `pushTokens/{room}/{id}` altında `{ "token": "...", "active": true }` olarak tutulur. String token değeri de desteklenir. Geçersiz ya da süresi dolmuş FCM token'ları `active: false` yapılır.
+Firebase Cloud Messaging registration token'ları oda bazında `fcmTokens/{room}/{id}`, `fcm_tokens/{room}/{id}` veya `pushTokens/{room}/{id}` altında `{ "token": "...", "active": true }` olarak tutulabilir. Misafir uygulamasının kullandığı format olan `push_subscriptions/{id}` altındaki `{ "token": "...", "roomNumber": "502" }` kayıtları da desteklenir. String token değeri de desteklenir. Geçersiz ya da süresi dolmuş FCM token'ları `active: false` yapılır.
 
 Gönderim kaydı `push_send_logs/{checkoutDate}/{room}` altında tutulur. Aynı tarih ve oda kaydı varsa ikinci gönderim yapılmaz. Kayıtta `room`, `checkoutDate`, `sentAt` ve `result` alanları bulunur.
 
