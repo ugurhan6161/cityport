@@ -266,6 +266,20 @@ function allowedRoomStatuses(role, roomKey){
   if(role==='housekeeper') return roomKey==='dirty' ? ['progress'] : [];
   return roomStatusPermissions[role] || [];
 }
+function addFrontDeskRoomStatusChoices(){
+  if(currentRole!=='front_desk') return;
+  document.querySelectorAll('.room-card[data-room]').forEach(card=>{
+    const room=rooms.find(item=>item[0]===card.dataset.room);
+    const choices=room&&allowedRoomStatuses(currentRole,room[2]).filter(key=>key!==room[2]);
+    const actions=card.querySelector('.room-card-actions');
+    if(!choices?.length||!actions||actions.querySelector('.front-desk-status-choices')) return;
+    const container=document.createElement('div');
+    container.className='room-status-choices front-desk-status-choices';
+    container.setAttribute('aria-label','Yeni oda durumu');
+    container.innerHTML=choices.map(key=>`<button class="room-status-choice status-choice-${esc(key)}" data-action="set-room-status" data-room="${esc(room[0])}" data-status-key="${esc(key)}">${labels[key]}</button>`).join('');
+    actions.appendChild(container);
+  });
+}
 function roomStatusForm(room){
   const options=allowedRoomStatuses(currentRole, room[2]);
   return `<form class="management-form" data-form="room-status" data-room="${esc(room[0])}"><p class="panel-meta">${esc(room[0])} numaralı oda için izin verilen durumu seçin.</p><div class="form-field"><label>Yeni oda durumu</label><select name="statusKey" required>${options.map(key=>`<option value="${key}" ${key===room[2]?'selected':''}>${labels[key]}</option>`).join('')}</select></div><div class="modal-actions"><button type="button" class="outline-button" data-close-modal>İptal</button><button class="primary-button">Durumu kaydet</button></div></form>`;
@@ -288,6 +302,7 @@ function render(view=currentView){
   currentView=view;
   const views={dashboard,rooms:roomsView,issues:()=>operationalView('issues'),requests:()=>operationalView('guest_requests'),reports:reportsView,users:usersManagementView,notifications:notificationsView,settings:settingsView,cafe:cafeView};
   app.innerHTML=(views[view]||dashboard)();
+  addFrontDeskRoomStatusChoices();
   const activeTitle={dashboard:'Genel Bakış',rooms:'Odalar',issues:'Sorunlar',requests:'Misafir Talepleri',reports:'Raporlar',users:'Kullanıcılar',notifications:'Özel Bildirimler',settings:'Otel Ayarları',cafe:'Cafe'}[view];
   title.textContent=activeTitle;
   document.querySelectorAll('.nav-item[data-view]').forEach(item=>{item.classList.toggle('active',item.dataset.view===view);item.hidden=!item.dataset.roles.split(',').includes(currentRole);});
