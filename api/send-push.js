@@ -105,7 +105,7 @@ function tokensForRoom(root, room) {
 function messageFor(room, hotelName = 'Cityport Hotel') {
   return {
     room,
-    title: 'Cityport Hotel',
+    title: hotelName,
     body: 'TR: Bugün çıkış gününüz. Lütfen odanızı saat 12:00\'ye kadar boşaltmanız ricadır.\n\nEN: Today is your checkout day. Please vacate your room by 12:00.',
     url: '/'
   };
@@ -136,7 +136,7 @@ async function sendForRoom(db, root, room, checkoutDate, request) {
     const batch = tokens.slice(index, index + 500);
     const response = await admin.messaging().sendEachForMulticast({
       tokens: batch.map(entry => entry.token),
-      data: { title: 'Cityport Hotel', body: String(message.body), room: String(room), checkoutDate, url: message.url || '/' },
+      data: { title: String(message.title || root.settings?.hotelName || 'Cityport Hotel'), body: String(message.body), room: String(room), checkoutDate, url: message.url || '/' },
       webpush: { fcmOptions: { link: message.url || '/' } }
     });
     response.responses.forEach((delivery, deliveryIndex) => {
@@ -205,12 +205,13 @@ module.exports = async function handler(req, res) {
     const rootSnapshot = await database.ref('/').once('value');
     const root = rootSnapshot.val() || {};
     const requestedRoom = String(req.body?.room || '').trim();
+    const requestedRooms = [...new Set((Array.isArray(req.body?.rooms) ? req.body.rooms : requestedRoom ? [requestedRoom] : []).map(room => String(room).trim()).filter(Boolean))];
     const request = req.body?.body ? { title: req.body.title || root.settings?.hotelName || 'Cityport Hotel', body: req.body.body, url: req.body.url || '/' } : {};
     const rooms = new Set();
     if (actor.type === 'admin' && req.body?.manual === true) {
-      if (!requestedRoom || !request.body) return res.status(400).json({ error: 'Manuel bildirim için oda ve mesaj gereklidir.' });
-      const result = await sendManualForRoom(database, root, requestedRoom, request, actor.uid);
-      return res.status(200).json({ ok: true, manual: true, results: [result] });
+      if (!requestedRooms.length || !request.body) return res.status(400).json({ error: 'Manuel bildirim için en az bir oda ve mesaj gereklidir.' });
+      const results = await Promise.all(requestedRooms.map(room => sendManualForRoom(database, root, room, request, actor.uid)));
+      return res.status(200).json({ ok: true, manual: true, results });
     }
     records(root.reservations).forEach(([, reservation]) => {
       if (isActiveReservation(reservation) && istanbulDate(reservation.checkoutDate) === checkoutDate && roomOf(reservation)) rooms.add(roomOf(reservation));

@@ -25,6 +25,8 @@ let cafeSearch = '';
 let cafeCategoryFilter = 'all';
 let cafeActiveFilter = 'all';
 let cafeSort = 'sortOrder';
+let checkoutMonitorTimer = null;
+let settingsLoaded = false;
 const roleLabels = { admin:'Yönetici', supervisor:'Süpervizör', housekeeper:'Kat hizmetleri', front_desk:'Ön büro', maintenance:'Teknik servis' };
 const roleViews = {
   admin: ['dashboard','rooms','issues','requests','reports','users','settings','cafe'],
@@ -194,7 +196,7 @@ function attachDataListeners(){
   dataListenersAttached = true;
   ['issues','guest_requests','users','cafe_products'].forEach(path => firebaseDatabase.ref(path).on('value', snapshot => { records[path] = snapshot.val() || {}; render(currentView); }, error => { console.warn(`${path} okunamadı`, error); if(path==='users') showToast('Kullanıcı listesi okunamadı. Firebase Rules kontrol edilmeli.'); if(path==='cafe_products') showToast('Cafe ürünleri okunamadı. Firebase Rules kontrol edilmeli.'); }));
   firebaseDatabase.ref('manual_notification_logs').on('value', snapshot => { records.manual_notification_logs = snapshot.val() || {}; if(currentView==='notifications') render(currentView); });
-  firebaseDatabase.ref('settings').on('value', snapshot => { records.settings = snapshot.val() || {}; applyHotelName(); render(currentView); });
+  firebaseDatabase.ref('settings').on('value', snapshot => { records.settings = snapshot.val() || {}; settingsLoaded = true; applyHotelName(); render(currentView); startCheckoutMonitor(); });
 }
 function applyHotelName(){
   const hotelName = records.settings.hotelName || 'Cityport Hotel';
@@ -244,6 +246,39 @@ function settingsView(){ return `${shellHeading('Yönetim','Otel ayarları','Ote
 function usersManagementView(){ const rows=recordRows('users'); return `${shellHeading('Yönetim','Kullanıcılar','Kayıt olan personelin rolünü ve aktiflik durumunu belirleyin.')}<div class="filter-row"><span class="panel-meta">Yeni kayıtlar otomatik Firebase UID ile burada görünür. Rol verilene kadar beklemede kalır.</span></div><section class="panel"><table class="table"><thead><tr><th>PERSONEL</th><th>E-POSTA</th><th>ROL</th><th>DURUM</th><th></th></tr></thead><tbody>${rows.length?rows.map(([id,item])=>`<tr><td><strong>${esc(item.full_name||'-')}</strong><br><span class="panel-meta">UID: ${esc(id)}</span></td><td>${esc(item.email||'-')}</td><td>${esc(roleLabels[item.role]||item.role||'Rol bekliyor')}</td><td><span class="status-badge ${item.is_active===false?'open':''}">${item.is_active===false?'Beklemede':'Aktif'}</span></td><td><div class="table-actions"><button class="mini-button" data-action="edit-user" data-id="${esc(id)}">Rolü düzenle</button><button class="mini-button" data-action="delete-user" data-id="${esc(id)}">Sil</button></div></td></tr>`).join(''):'<tr><td colspan="5" class="empty-state">Henüz kayıt olan personel bulunmuyor.</td></tr>'}</tbody></table></section>`; }
 function operationalView(type){ const isIssue=type==='issues'; const rows=recordRows(type); return `${shellHeading(isIssue?'Operasyon / Takip':'Operasyon / Misafir deneyimi',isIssue?'Sorunlar':'Misafir talepleri',isIssue?'Bakım ve arıza kayıtlarını yönetin.':'Misafir taleplerini ekibe atayın ve takip edin.',isIssue?'issue':'request')}<section class="panel"><table class="table"><thead><tr><th>${isIssue?'SORUN':'TALEP'}</th><th>ODA</th><th>ÖNCELİK</th><th>ATANAN</th><th>DURUM</th><th></th></tr></thead><tbody>${rows.length?rows.map(([id,item])=>`<tr><td><strong>${esc(item.title||item.requestType||'-')}</strong><br><span class="panel-meta">${esc(item.description||'')}</span></td><td>${esc(item.roomNumber||'-')}</td><td><span class="priority ${item.priority==='high'||item.priority==='urgent'?'high':'medium'}">${priorityText[item.priority]||item.priority||'Normal'}</span></td><td>${esc(item.assignedTo||'Atanmadı')}</td><td><span class="status-badge ${item.status==='open'?'open':item.status==='in_progress'?'progress':''}">${statusText[item.status]||item.status||'-'}</span></td><td><div class="table-actions"><button class="mini-button" data-action="edit-${isIssue?'issue':'request'}" data-id="${esc(id)}">Düzenle</button><button class="mini-button" data-action="delete-${isIssue?'issue':'request'}" data-id="${esc(id)}">Sil</button></div></td></tr>`).join(''):'<tr><td colspan="6" class="empty-state">Henüz kayıt bulunmuyor.</td></tr>'}</tbody></table></section>`; }
 function reportsView(){ const roomCounts=rooms.reduce((acc,room)=>{acc[room[2]]=(acc[room[2]]||0)+1;return acc;},{}); return `${shellHeading('Yönetim','Raporlar','Operasyonun güncel durumunu tek ekranda inceleyin.')}<section class="stats-grid">${stat('TOPLAM ODA',rooms.length,'Kayıtlı oda','▦')}${stat('TEMİZ ODA',roomCounts.clean||0,'Güncel durum','✓')}${stat('AÇIK SORUN',recordRows('issues').filter(([,item])=>item.status!=='resolved'&&item.status!=='closed').length,'Çözüm bekleyen','△')}${stat('BEKLEYEN TALEP',recordRows('guest_requests').filter(([,item])=>item.status!=='completed').length,'Misafir işleri','♧')}</section><section class="panel" style="padding:22px"><h2 class="panel-title">Durum dağılımı</h2><div class="room-stats" style="margin-top:18px">${Object.entries(labels).map(([key,label])=>`<span><b>${roomCounts[key]||0}</b> ${label}</span>`).join('')}</div></section>`; }
+function cafeOrderRows(){ return recordRows('guest_requests').filter(([, item]) => item.requestType === 'cafe'); }
+function cafeMoney(value){ return Number(value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function cafeOrderForm(){
+  const products=Object.entries(records.cafe_products || {}).filter(([, item])=>item.active!==false).sort((a,b)=>(Number(a[1].sortOrder)||0)-(Number(b[1].sortOrder)||0));
+  return `<form class="management-form" data-form="cafe-order"><div class="form-grid"><div class="form-field"><label>Oda numarası</label><input name="roomNumber" required></div><div class="form-field"><label>Misafir adı</label><input name="guestName" required></div><div class="form-field full"><label>Ürünler</label><textarea name="itemsText" rows="7" placeholder="Ürün adı | adet&#10;Örn. Türk kahvesi | 2" required></textarea><p class="panel-meta">Menü: ${products.map(([, item])=>`${esc(item.name)} (${cafeMoney(item.price)} TRY)`).join(', ') || 'Ürün yok'}</p></div><div class="form-field full"><label>Not</label><textarea name="description" rows="2"></textarea></div></div><div class="modal-actions"><button type="button" class="outline-button" data-close-modal>İptal</button><button class="primary-button">Siparişi oluştur</button></div></form>`;
+}
+function cafeOrderPaymentForm(id){
+  const item=records.guest_requests?.[id] || {};
+  return `<form class="management-form" data-form="cafe-payment" data-id="${esc(id)}"><p class="panel-meta">${esc(item.guestName || 'Misafir')} · Oda ${esc(item.roomNumber || '-')} · Toplam ${cafeMoney(item.total)} TRY</p><div class="form-grid"><div class="form-field"><label>Ödeme yöntemi</label><select name="paymentMethod"><option value="cash">Nakit</option><option value="card">Kart / POS</option><option value="room_charge">Odaya aktar</option></select></div><div class="form-field"><label>Alınan tutar</label><input type="number" name="paidAmount" min="0" step="0.01" value="${esc(item.total || 0)}" required></div></div><div class="modal-actions"><button type="button" class="outline-button" data-close-modal>İptal</button><button class="primary-button">Ödemeyi al ve hesabı kapat</button></div></form>`;
+}
+function cafeView(){
+  const orders=cafeOrderRows();
+  const paid=orders.filter(([, item])=>item.paymentStatus==='paid');
+  const open=orders.filter(([, item])=>item.paymentStatus!=='paid' && item.status!=='closed');
+  const today=new Date().toLocaleDateString('en-CA');
+  const todaySales=paid.filter(([, item])=>new Date(item.paidAt || item.createdAt || 0).toLocaleDateString('en-CA')===today).reduce((sum,[,item])=>sum+Number(item.total||0),0);
+  const rows=orders.slice(0,80);
+  return `${shellHeading('Yönetim / POS','Cafe','Sipariş alın, ödeme kaydedin, hesap kapatın ve günlük satışları izleyin.')}<div class="cafe-toolbar"><button class="primary-button" data-action="cafe-order">＋ Yeni sipariş</button>${stat('AÇIK HESAP',open.length,'Ödeme bekleyen','◷')}${stat('BUGÜNÜN SATIŞI',`${cafeMoney(todaySales)} TRY`,'Ödenen cafe siparişleri','₺')}${stat('TOPLAM SİPARİŞ',orders.length,'Kayıtlı sipariş','☕')}</div><section class="panel"><div class="panel-head"><div><h2 class="panel-title">Siparişler</h2><p class="panel-meta">POS işlem geçmişi ve açık hesaplar</p></div></div><div class="table-scroll"><table class="table"><thead><tr><th>SİPARİŞ</th><th>ODA</th><th>ÜRÜNLER</th><th>TUTAR</th><th>DURUM</th><th></th></tr></thead><tbody>${rows.length?rows.map(([id,item])=>`<tr><td><strong>${esc(item.guestName||'Misafir')}</strong><br><span class="panel-meta">${formatDateTime(item.createdAt)}</span></td><td>${esc(item.roomNumber||'-')}</td><td class="cafe-order-items">${esc(cafeItemsText(item.items))}</td><td class="cafe-order-total">${cafeMoney(item.total)} ${esc(item.currency||'TRY')}</td><td><span class="status-badge ${item.paymentStatus==='paid'?'':'open'}">${item.paymentStatus==='paid'?'Ödendi':item.status==='closed'?'Kapandı':'Açık hesap'}</span>${item.paymentMethod?`<br><small class="panel-meta">${item.paymentMethod==='card'?'POS':item.paymentMethod==='room_charge'?'Odaya aktar':'Nakit'}</small>`:''}</td><td><div class="table-actions">${item.paymentStatus==='paid'?'<span class="panel-meta">Hesap kapalı</span>':`<button class="mini-button" data-action="pay-cafe-order" data-id="${esc(id)}">Ödeme al</button><button class="mini-button" data-action="close-cafe-order" data-id="${esc(id)}">Hesabı kapat</button>`}</div></td></tr>`).join(''):'<tr><td colspan="6" class="empty-state">Henüz cafe siparişi yok.</td></tr>'}</tbody></table></div></section><section class="panel" style="padding:20px"><h2 class="panel-title">Menü ürünleri</h2><p class="panel-meta">Ürün ekleme, fiyat ve stok görünürlüğü için mevcut ürün yönetimi.</p><button class="outline-button" data-action="cafe-product">Menü ürünlerini yönet</button></section>`;
+}
+function notificationsView(){
+  const logs=recordRows('manual_notification_logs').slice(0,20); const settings=records.settings || {};
+  return `${shellHeading('Yönetim','Özel Bildirimler','Toplu bildirim gönderin ve checkout bildirimlerini otomatikleştirin.')}<section class="settings-grid"><section class="setting-card"><h3>Toplu bildirim gönder</h3><form class="management-form" data-form="manual-notification"><div class="form-field full"><label>Odalar</label><div class="notification-room-grid"><label><input type="checkbox" data-select-all-rooms> Tüm odalar</label>${rooms.map(([number])=>`<label><input type="checkbox" name="rooms" value="${esc(number)}"> ${esc(number)}</label>`).join('')}</div></div><div class="form-grid"><div class="form-field full"><label>Başlık</label><input name="title" value="${esc(settings.hotelName || 'Cityport Hotel')}" required></div><div class="form-field full"><label>Mesaj şablonu</label><textarea name="body" rows="5" required>${esc(settings.notificationTemplate || '')}</textarea></div><div class="form-field full"><label>Bağlantı</label><input name="url" value="/" placeholder="/"></div></div><div class="modal-actions"><button class="primary-button" type="submit">Bildirimi gönder</button></div></form></section><section class="setting-card"><h3>Checkout otomasyonu</h3><p class="panel-meta">Uygulama açıkken belirlenen saatte backend aktif checkout odalarını tarar. Backend aynı oda ve gün için ikinci gönderimi engeller.</p><form class="management-form" data-form="checkout-settings"><div class="form-grid"><div class="form-field"><label>Otomatik gönderim</label><select name="checkoutAutoEnabled"><option value="true" ${settings.checkoutAutoEnabled!==false?'selected':''}>Açık</option><option value="false" ${settings.checkoutAutoEnabled===false?'selected':''}>Kapalı</option></select></div><div class="form-field"><label>Gönderim saati (İstanbul)</label><input type="time" name="checkoutAutoTime" value="${esc(settings.checkoutAutoTime || '09:00')}" required></div><div class="form-field full"><label>Checkout mesaj şablonu</label><textarea name="checkoutTemplate" rows="5" required>${esc(settings.checkoutTemplate || 'TR: Bugün çıkış gününüz. Lütfen odanızı saat 12:00\'ye kadar boşaltmanız ricadır.\n\nEN: Today is your checkout day. Please vacate your room by 12:00.')}</textarea></div></div><div class="modal-actions"><button class="primary-button">Checkout ayarlarını kaydet</button></div></form></section></section><section class="setting-card" style="margin-top:16px"><h3>Son manuel gönderimler</h3><div class="notification-log-list">${logs.length?logs.map(([,item])=>`<div class="notification-log"><strong>${item.room?'Oda '+esc(item.room):'Toplu gönderim'}</strong><span>${esc(item.title||'-')}</span><small>${esc(item.result||'-')} · ${formatDateTime(item.sentAt)}</small></div>`).join(''):'<p class="empty-state">Henüz manuel bildirim gönderilmedi.</p>'}</div></section>`;
+}
+function startCheckoutMonitor(){
+  if(checkoutMonitorTimer||!firebaseDatabase||currentRole!=='admin'||!settingsLoaded) return;
+  const check=async()=>{
+    const settings=records.settings || {}; if(settings.checkoutAutoEnabled===false) return;
+    const now=new Date(); const time=now.toLocaleTimeString('en-GB',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit'}); if(time < (settings.checkoutAutoTime || '09:00')) return;
+    const day=now.toLocaleDateString('en-CA',{timeZone:'Europe/Istanbul'}); if(sessionStorage.getItem(`checkout-push-${day}`)) return;
+    try { const token=await currentUser.getIdToken(); const response=await fetch('/api/send-push',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({body:settings.checkoutTemplate||undefined,title:settings.hotelName||'Cityport Hotel',url:'/'})}); const result=await response.json(); if(!response.ok) throw new Error(result.error||'checkout push failed'); if(result.results?.length){ sessionStorage.setItem(`checkout-push-${day}`,'1'); showToast('Checkout bildirim kontrolü tamamlandı.'); } } catch(error){ console.warn('Checkout otomatik bildirimi başarısız:',error); }
+  };
+  check(); checkoutMonitorTimer=setInterval(check, 5*60*1000);
+}
 roleViews.admin.push('settings','notifications');
 function roomActivity(roomNumber){
   const issues=recordRows('issues').filter(([,item])=>String(item.roomNumber)===String(roomNumber)&&!['resolved','closed'].includes(item.status));
@@ -322,6 +357,14 @@ document.addEventListener('click',(event)=>{
   if(action==='open-room-filters'){const template=document.querySelector('.room-filter-template');if(template)modal('Oda filtreleri',template.innerHTML);return;}
   if(action==='bulk-rooms'){if(currentRole!=='admin'){showToast('Toplu oda ekleme yalnızca admin içindir.');return;} modal('Toplu oda ekle',bulkRoomForm());return;}
   if(action==='cafe-product'){if(canManageCafe())modal('Yeni cafe ürünü',recordForm('cafe_products'));return;}
+  if(action==='cafe-order'){if(canManageCafe())modal('Yeni cafe siparişi',cafeOrderForm());return;}
+  if(action==='pay-cafe-order'){if(canManageCafe())modal('POS ödeme al',cafeOrderPaymentForm(event.target.closest('[data-action]').dataset.id));return;}
+  if(action==='close-cafe-order'){
+    if(!canManageCafe())return;
+    const id=event.target.closest('[data-action]').dataset.id;
+    firebaseDatabase.ref(`guest_requests/${id}`).update({status:'closed',paymentStatus:'paid',paymentMethod:'manual_close',paidAt:firebase.database.ServerValue.TIMESTAMP,closedAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP,updatedBy:currentUser?.uid||null}).then(()=>showToast('Cafe hesabı kapatıldı.')).catch(()=>showToast('Cafe hesabı kapatılamadı.'));
+    return;
+  }
   if(action==='edit-cafe-product'){if(canManageCafe())modal('Cafe ürününü düzenle',recordForm('cafe_products',event.target.closest('[data-action]').dataset.id));return;}
   if(action==='toggle-cafe-product'){
     if(!canManageCafe())return;
@@ -385,6 +428,7 @@ document.addEventListener('change',(event)=>{
   if(statusSelect){ roomStatusFilter=statusSelect.value; render('rooms'); }
   const cafeControl=event.target.closest('[data-cafe-category],[data-cafe-active],[data-cafe-sort]');
   if(cafeControl){ cafeCategoryFilter=document.querySelector('[data-cafe-category]')?.value||'all'; cafeActiveFilter=document.querySelector('[data-cafe-active]')?.value||'all'; cafeSort=document.querySelector('[data-cafe-sort]')?.value||'sortOrder'; render('cafe'); }
+  if(event.target.matches('[data-select-all-rooms]')) document.querySelectorAll('[name="rooms"]').forEach(input=>{input.checked=event.target.checked;});
 });
 document.addEventListener('input',(event)=>{
   if(event.target.matches('[data-cafe-search]')){ cafeSearch=event.target.value; render('cafe'); const input=document.querySelector('[data-cafe-search]'); input?.focus(); input?.setSelectionRange(cafeSearch.length,cafeSearch.length); }
@@ -392,9 +436,29 @@ document.addEventListener('input',(event)=>{
 document.addEventListener('submit',(event)=>{
   const form=event.target.closest('.management-form'); if(!form)return; event.preventDefault(); const data=Object.fromEntries(new FormData(form));
   if(form.dataset.form==='manual-notification'){
-    if(!adminOnly()||!currentUser||!data.room||!data.body){showToast('Oda ve mesaj zorunludur.');return;}
+    const selectedRooms=[...form.querySelectorAll('[name="rooms"]:checked')].map(input=>input.value);
+    if(!adminOnly()||!currentUser||!selectedRooms.length||!data.body){showToast('En az bir oda ve mesaj zorunludur.');return;}
     const button=form.querySelector('button[type="submit"]'); button.disabled=true;
-    currentUser.getIdToken().then(idToken=>fetch('/api/send-push',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify({manual:true,room:data.room,title:data.title,body:data.body,url:data.url||'/'})})).then(async response=>{const result=await response.json();if(!response.ok){const detail=result.errorType?` (${result.errorType})`:'';throw new Error(`${result.error||'Bildirim gönderilemedi.'}${detail}`);}return result;}).then(result=>{const outcome=result.results?.[0];showToast(outcome?.result==='no_subscription'?'Bu oda için aktif cihaz bulunamadı.':'Bildirim gönderildi.');form.reset();form.querySelector('[name="url"]').value='/';}).catch(error=>showToast(error.message||'Bildirim gönderilemedi.')).finally(()=>{button.disabled=false;}); return;
+    currentUser.getIdToken().then(idToken=>fetch('/api/send-push',{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'},body:JSON.stringify({manual:true,rooms:selectedRooms,title:data.title,body:data.body,url:data.url||'/'})})).then(async response=>{const result=await response.json();if(!response.ok){const detail=result.errorType?` (${result.errorType})`:'';throw new Error(`${result.error||'Bildirim gönderilemedi.'}${detail}`);}return result;}).then(result=>{showToast(`${result.results?.filter(item=>item.result==='sent').length||0}/${selectedRooms.length} odaya bildirim gönderildi.`);form.reset();form.querySelector('[name="url"]').value='/';}).catch(error=>showToast(error.message||'Bildirim gönderilemedi.')).finally(()=>{button.disabled=false;}); return;
+  }
+  if(form.dataset.form==='checkout-settings'){
+    if(!adminOnly())return;
+    firebaseDatabase.ref('settings').update({checkoutAutoEnabled:data.checkoutAutoEnabled==='true',checkoutAutoTime:data.checkoutAutoTime,checkoutTemplate:data.checkoutTemplate}).then(()=>showToast('Checkout otomasyonu kaydedildi.')).catch(()=>showToast('Checkout ayarları kaydedilemedi.'));
+    return;
+  }
+  if(form.dataset.form==='cafe-order'){
+    if(!canManageCafe())return;
+    const productMap=Object.entries(records.cafe_products||{}).filter(([,item])=>item.active!==false).reduce((map,[id,item])=>{map[item.name.toLocaleLowerCase('tr-TR')]={id,...item};return map;},{});
+    const items=data.itemsText.split(/\r?\n/).map(line=>line.split('|').map(value=>value.trim())).filter(parts=>parts[0]).map(([name,quantity='1'])=>{const product=productMap[name.toLocaleLowerCase('tr-TR')];return product?{productId:product.id||null,name:product.name,quantity:Math.max(1,Number(quantity)||1),unitPrice:Number(product.price)||0,totalPrice:(Math.max(1,Number(quantity)||1))*(Number(product.price)||0)}:null;}).filter(Boolean);
+    if(!items.length){showToast('Menüden geçerli en az bir ürün girin.');return;}
+    const total=items.reduce((sum,item)=>sum+item.totalPrice,0); const id=dbKey();
+    writeRecord('guest_requests',id,{requestType:'cafe',roomNumber:data.roomNumber.trim(),guestName:data.guestName.trim(),items,total,currency:'TRY',description:data.description.trim(),status:'waiting',paymentStatus:'unpaid'}).then(()=>{closeModal();render('cafe');showToast('Cafe siparişi oluşturuldu.');}).catch(()=>showToast('Cafe siparişi oluşturulamadı.')); return;
+  }
+  if(form.dataset.form==='cafe-payment'){
+    if(!canManageCafe())return;
+    const id=form.dataset.id; const order=records.guest_requests?.[id]; const paidAmount=Number(data.paidAmount);
+    if(!order||!Number.isFinite(paidAmount)||paidAmount<Number(order.total||0)){showToast('Ödeme tutarı sipariş toplamından küçük olamaz.');return;}
+    firebaseDatabase.ref(`guest_requests/${id}`).update({status:'closed',paymentStatus:'paid',paymentMethod:data.paymentMethod,paidAmount,paidAt:firebase.database.ServerValue.TIMESTAMP,closedAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP,updatedBy:currentUser?.uid||null}).then(()=>{closeModal();render('cafe');showToast('Ödeme alındı, hesap kapatıldı.');}).catch(()=>showToast('Ödeme kaydedilemedi.')); return;
   }
   if(form.dataset.form==='settings'){ if(!adminOnly())return; const settings={...data}; if(settings.autoOutOfOrder)settings.autoOutOfOrder=settings.autoOutOfOrder==='true'; firebaseDatabase.ref('settings').update(settings).then(()=>showToast('Ayarlar güncellendi.')).catch(()=>showToast('Ayarlar kaydedilemedi.')); return; }
   if(form.dataset.form==='room-status'){
