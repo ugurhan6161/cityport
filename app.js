@@ -90,7 +90,14 @@ function roomRecord([number, status, key, floor, roomType='Standart', guestName=
 function saveRoomToFirebase(room, previousStatus){
   if (!firebaseReady || !firebaseDatabase) return;
   const roomRef = firebaseDatabase.ref(`rooms/${room[0]}`);
-  roomRef.update(roomRecord(room)).then(() => {
+  roomRef.update({
+    ...roomRecord(room),
+    pendingSync: true,
+    requestedStatusKey: room[2],
+    requestedLabel: room[1],
+    requestedAt: firebase.database.ServerValue.TIMESTAMP,
+    source: 'housekeeping-app'
+  }).then(() => {
     return firebaseDatabase.ref('room_status_logs').push({ roomId: room[0], oldStatus: previousStatus, newStatus: room[2], changedAt: firebase.database.ServerValue.TIMESTAMP, changedBy: 'demo-supervisor' });
   }).then(() => {
     if(room[2]==='dirty') return removeCompletedRequestsForRoom(room[0]);
