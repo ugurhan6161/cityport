@@ -3,15 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#f5f7f8" />
+  <meta name="theme-color" content="#087e78" />
   <meta name="description" content="Otel Housekeeping yönetim paneli" />
   <title>Otel Housekeeping</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="responsive.css" />
+  <meta property="og:image" content="https://bolt.new/static/og_default.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
 </head>
 <body>
   <section class="auth-screen" id="authScreen" aria-label="Giriş ekranı">
@@ -62,7 +65,16 @@
     </aside>
 
     <main class="main-content">
-      <header class="topbar"><button class="menu-button" id="menuButton" aria-label="Menüyü aç">☰</button><div class="breadcrumb"><span id="hotelNameBreadcrumb">Cityport Hotel</span><b>/</b><strong id="pageTitle">Genel Bakış</strong></div><div class="top-actions"><div class="sync-pill"><span class="online-dot"></span><span>Çevrimiçi</span><small id="syncText">· Güncel</small></div><button class="icon-button" aria-label="Bildirimler">♢<i></i></button><button class="top-logout" data-action="logout">Çıkış</button><div class="avatar coral" id="topAvatar">SD</div></div></header>
+      <header class="topbar">
+        <button class="menu-button" id="menuButton" aria-label="Menüyü aç">☰</button>
+        <div class="breadcrumb"><span id="hotelNameBreadcrumb">Cityport Hotel</span><b>/</b><strong id="pageTitle">Genel Bakış</strong></div>
+        <div class="top-actions">
+          <div class="sync-pill"><span class="online-dot"></span><span>Çevrimiçi</span><small id="syncText">· Güncel</small></div>
+          <button class="icon-button" aria-label="Bildirimler">♢<i></i></button>
+          <button class="top-logout" data-action="logout">Çıkış</button>
+          <div class="avatar coral" id="topAvatar">SD</div>
+        </div>
+      </header>
       <div class="page" id="app"></div>
     </main>
   </div>
