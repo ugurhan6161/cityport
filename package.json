@@ -4,7 +4,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "echo \"Static site — no build step required\""
+    "build": "node build.js"
   },
   "dependencies": {
     "firebase-admin": "^13.0.2"
