@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2"
+  }
+}

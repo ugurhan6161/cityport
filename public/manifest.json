@@ -1,0 +1,10 @@
+{
+  "name": "Otel Housekeeping",
+  "short_name": "Housekeeping",
+  "lang": "tr",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f4f7f7",
+  "theme_color": "#087e78",
+  "icons": []
+}
