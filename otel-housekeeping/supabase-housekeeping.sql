@@ -7,10 +7,16 @@ create table if not exists public.housekeeping_records (
   updated_at timestamptz not null default now(),
   primary key (collection, record_id),
   constraint housekeeping_records_collection_valid
-    check (collection in ('users', 'settings', 'reservations', 'manual_notification_logs')),
+    check (collection in ('users', 'settings', 'reservations', 'manual_notification_logs', 'push_send_logs')),
   constraint housekeeping_records_id_valid
     check (length(record_id) between 1 and 180)
 );
+
+alter table public.housekeeping_records
+  drop constraint if exists housekeeping_records_collection_valid;
+alter table public.housekeeping_records
+  add constraint housekeeping_records_collection_valid
+    check (collection in ('users', 'settings', 'reservations', 'manual_notification_logs', 'push_send_logs'));
 
 alter table public.housekeeping_records enable row level security;
 revoke all on public.housekeeping_records from anon, authenticated;

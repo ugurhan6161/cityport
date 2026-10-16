@@ -149,7 +149,11 @@ function render(view=currentView){
   if (!canAccess(view)) view = 'dashboard';
   currentView=view;
   const views={dashboard,rooms:roomsView,issues:issuesView,requests:requestsView,reports:()=>genericView('Raporlar','Operasyon performansını ve geçmiş verileri inceleyin.'),users:()=>genericView('Kullanıcılar','Ekip üyelerini ve rollerini yönetin.')};
-  app.innerHTML=(views[view]||dashboard)();
+  app.innerHTML=(views[view]||dashboard)()
+    .replaceAll('Gerçek zamanlı Firebase verisi','Supabase verisi')
+    .replaceAll('Firebase bağlantısı','Personel giriş durumu')
+    .replaceAll('Veriler gerçek zamanlı olarak Realtime Database ile eşitleniyor.','Uygulama kayıtları Supabase üzerinden yönetiliyor.')
+    .replaceAll('Yeni kayıtlar otomatik Firebase UID ile burada görünür.','Yeni kayıtlar Firebase Authentication UID ile Supabase\'e kaydedilir.');
   const activeTitle={dashboard:'Genel Bakış',rooms:'Odalar',issues:'Sorunlar',requests:'Misafir Talepleri',reports:'Raporlar',users:'Kullanıcılar'}[view];
   title.textContent=activeTitle;
   document.querySelectorAll('.nav-item[data-view]').forEach(item=>{ item.classList.toggle('active',item.dataset.view===view); item.hidden=!item.dataset.roles.split(',').includes(currentRole); });

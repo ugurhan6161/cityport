@@ -1,4 +1,4 @@
-const housekeepingCollections = new Set(['users', 'settings', 'reservations', 'manual_notification_logs']);
+const housekeepingCollections = new Set(['users', 'settings', 'reservations', 'manual_notification_logs', 'push_send_logs']);
 const hotelRecordCollections = new Set(['issues', 'guest_requests', 'cafe_products', 'push_subscriptions', 'room_status_logs']);
 
 function getConfig() {
@@ -87,6 +87,25 @@ async function saveRecord(collection, id, data) {
   return rows?.[0]?.data || data;
 }
 
+async function createRecord(collection, id, data) {
+  const table = tableFor(collection);
+  const isRoom = collection === 'rooms';
+  const record = isRoom
+    ? { room_id: id, data, updated_at: new Date().toISOString() }
+    : collection === 'users' || collection === 'settings' || collection === 'reservations' || collection === 'manual_notification_logs' || collection === 'push_send_logs'
+      ? { collection, record_id: id, data, updated_at: new Date().toISOString() }
+      : { collection, record_id: id, parent_id: '', data, updated_at: new Date().toISOString() };
+  const rows = await restRequest(table, {}, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation'
+    },
+    body: JSON.stringify(record)
+  });
+  return rows?.[0]?.data || data;
+}
+
 async function patchRecord(collection, id, patch) {
   const existing = await getRecord(collection, id);
   if (!existing) {
@@ -107,4 +126,4 @@ async function deleteRecord(collection, id) {
   });
 }
 
-module.exports = { getRecord, listRecords, saveRecord, patchRecord, deleteRecord };
+module.exports = { getRecord, listRecords, saveRecord, createRecord, patchRecord, deleteRecord };

@@ -4,11 +4,11 @@
 
 ## Supabase housekeeping verileri
 
-Oda, personel profili, sorun, misafir talebi, cafe ürünü, otel ayarı, rezervasyon ve manuel bildirim geçmişi müşteri uygulamasının kullandığı Supabase projesinde tutulur. Firebase Authentication personel girişinde kullanılmaya devam eder. FCM token'ları ve otomatik checkout gönderim tekrarını engelleyen kayıtlar Firebase Realtime Database'de kalır; bildirimler Firebase Admin/FCM ile gönderilir.
+Oda, personel profili, sorun, misafir talebi, cafe ürünü, otel ayarı, rezervasyon, push aboneliği ve bildirim geçmişi müşteri uygulamasının kullandığı Supabase projesinde tutulur. Firebase Authentication personel girişinde, Firebase Cloud Messaging (FCM) ise bildirim teslimatında kullanılır. Firebase Realtime Database kullanılmaz.
 
-Vercel'de `SUPABASE_URL` ve yalnızca sunucuda saklanacak `SUPABASE_SERVICE_ROLE_KEY` değişkenlerini tanımlayın. Supabase Dashboard → SQL Editor'da önce müşteri uygulamasının ana `supabase/schema.sql` dosyasının, ardından bu proje içindeki `supabase-housekeeping.sql` dosyasının tamamını bir kez çalıştırın. Bu ek şema housekeeping personel profilleri, otel ayarları ve rezervasyonlar için `housekeeping_records` tablosunu oluşturur. Browser'a service role key eklemeyin.
+Vercel'de `SUPABASE_URL` ve yalnızca sunucuda saklanacak `SUPABASE_SERVICE_ROLE_KEY` değişkenlerini tanımlayın. İkisi de müşteri uygulamasının kullandığı aynı Supabase projesine ait olmalıdır. Supabase Dashboard → SQL Editor'da önce müşteri uygulamasının ana `supabase/schema.sql` dosyasını, ardından bu proje içindeki `supabase-housekeeping.sql` dosyasını çalıştırın. Ana şema `hotel_rooms` ve `hotel_records` tablolarını; ek şema housekeeping profilleri, ayarları, rezervasyonları ve push gönderim kayıtları için `housekeeping_records` tablosunu hazırlar. Browser'a service role key eklemeyin.
 
-Firebase Realtime Database dışa aktarımınızdan `users`, `settings`, `reservations` ve `manual_notification_logs` alanlarını alıp aşağıdaki RPC'yi çalıştırarak bu kayıtları içe aktarın. Aynı kimliğe sahip kayıtlar güncellenir. Oda, sorun, misafir talebi ve cafe ürünleri müşteri uygulamasının ana Supabase şemasındaki `hotel_rooms`/`hotel_records` tablolarını kullanır; bu veriler henüz taşınmadıysa müşteri uygulamasının Firebase içe aktarma talimatlarını önce uygulayın.
+Eski Firebase Realtime Database dışa aktarımınızdan `users`, `settings`, `reservations` ve `manual_notification_logs` alanlarını alıp aşağıdaki RPC'yi çalıştırarak bu kayıtları içe aktarın. Aynı kimliğe sahip kayıtlar güncellenir. Oda, sorun, misafir talebi, cafe ürünü ve push abonelikleri müşteri uygulamasının `hotel_rooms`/`hotel_records` tablolarını kullanır; henüz taşınmadıysa müşteri uygulamasının Firebase içe aktarma adımlarını önce tamamlayın. Eski Firebase push token'larını `hotel_records` tablosunun `push_subscriptions` koleksiyonuna taşıyın.
 
 ```sql
 select public.import_legacy_housekeeping_export($firebase_export$
@@ -30,7 +30,6 @@ $firebase_export$::jsonb);
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: Firebase Admin service-account JSON'u. Frontend'e eklenmez.
 - `FIREBASE_SERVICE_ACCOUNT_BASE64`: Alternatif olarak service-account JSON'unun Base64 kodlanmış hali. JSON değişkeninde satır sonu sorunu yaşanırsa bunu kullanın.
 - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`: JSON yapıştırmak sorun çıkarırsa servis hesabını üç ayrı değişken olarak tanımlamak için alternatif yöntem.
-- `FIREBASE_DATABASE_URL`: İsteğe bağlı; varsayılan proje database URL'sidir.
 
 `FIREBASE_SERVICE_ACCOUNT_JSON` içindeki `private_key` alanında gerçek satır sonları yerine `\\n` bulunması desteklenir. Değişkenleri Vercel'de **Production** ortamına ekledikten sonra yeni deployment yapılmalıdır.
 
@@ -49,11 +48,11 @@ Servis hesabı JSON'unu GitHub'a, frontend dosyalarına veya tarayıcı konsolun
 
 Checkout rezervasyonları Supabase `housekeeping_records` tablosundaki `reservations` koleksiyonundan okunur. Her kayıt `room` veya `roomNumber`, `checkoutDate` (`YYYY-MM-DD`) ve isteğe bağlı `status`/`active` alanları içerebilir. `cancelled`, `completed`, `checked_out` ve `closed` kayıtları aktif sayılmaz.
 
-Firebase Cloud Messaging registration token'ları oda bazında `fcmTokens/{room}/{id}`, `fcm_tokens/{room}/{id}` veya `pushTokens/{room}/{id}` altında `{ "token": "...", "active": true }` olarak tutulabilir. Misafir uygulamasının kullandığı format olan `push_subscriptions/{id}` altındaki `{ "token": "...", "roomNumber": "502" }` kayıtları da desteklenir. String token değeri de desteklenir. Geçersiz ya da süresi dolmuş FCM token'ları `active: false` yapılır.
+FCM token'ları Supabase `hotel_records` tablosunda `collection = 'push_subscriptions'` olarak tutulur. Her kayıt `token`, `roomNumber`, `guestName` ve isteğe bağlı `active` alanlarını içerir. Housekeeping uygulaması yalnızca ilgili odanın aktif token'larına bildirim yollar; geçersiz ya da süresi dolmuş token Supabase kaydında `active: false` yapılır.
 
 Gönderim data-only FCM mesajı olarak yapılır; misafir uygulamasının service worker'ı bildirimi tek kez gösterir. Başlık `Cityport Hotel` olarak sabitlenmiştir.
 
-Gönderim kaydı `push_send_logs/{checkoutDate}/{room}` altında tutulur. Aynı tarih ve oda kaydı varsa ikinci gönderim yapılmaz. Kayıtta `room`, `checkoutDate`, `sentAt` ve `result` alanları bulunur.
+Otomatik gönderim kaydı Supabase `housekeeping_records` tablosunda `collection = 'push_send_logs'` olarak tutulur. Oda ve tarih için benzersiz kayıt aynı gün ikinci gönderimi engeller. Manuel gönderim geçmişi `manual_notification_logs` koleksiyonundadır.
 
 ## Request
 

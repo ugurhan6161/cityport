@@ -1,15 +1,11 @@
 const admin = require('firebase-admin');
 const crypto = require('node:crypto');
 const { getFirebaseAdmin } = require('../lib/firebase-admin');
-const { getRecord, listRecords, saveRecord } = require('../lib/supabase');
+const { getRecord, listRecords, saveRecord, createRecord, patchRecord } = require('../lib/supabase');
 
 const TIME_ZONE = 'Europe/Istanbul';
 
-function getDatabase() {
-  return getFirebaseAdmin().database();
-}
-
-async function authorizeRequest(req, database) {
+async function authorizeRequest(req) {
   const expected = process.env.PUSH_API_SECRET;
   const authorization = req.headers.authorization || '';
   if (expected && authorization === `Bearer ${expected}`) return { type: 'scheduler' };
@@ -53,11 +49,9 @@ function tokenOf(value, id) {
 }
 
 function tokensForRoom(root, room) {
-  const candidates = [root.fcmTokens?.[room], root.fcm_tokens?.[room], root.pushTokens?.[room]];
   const subscriptions = Object.entries(root.push_subscriptions || {})
-    .filter(([, value]) => String(value?.roomNumber || '').trim() === String(room).trim())
-    .map(([id, value]) => [id, value]);
-  return [...candidates.flatMap(records), ...subscriptions]
+    .filter(([, value]) => String(value?.roomNumber || '').trim() === String(room).trim());
+  return subscriptions
     .map(([id, value]) => tokenOf(value, id)).filter(Boolean)
     .filter((entry, index, list) => list.findIndex(item => item.token === entry.token) === index);
 }
@@ -71,21 +65,22 @@ function messageFor(room, hotelName = 'Cityport Hotel') {
   };
 }
 
-async function sendForRoom(db, root, room, checkoutDate, request) {
-  const logRef = db.ref(`push_send_logs/${checkoutDate}/${encodeURIComponent(room)}`);
-  const claimId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const claim = await logRef.transaction(current => current || {
-    room,
-    checkoutDate,
-    sentAt: Date.now(),
-    result: 'processing',
-    claimId
-  });
-  if (!claim.committed || claim.snapshot.val()?.claimId !== claimId) return { room, result: 'already_sent' };
-
+async function sendForRoom(root, room, checkoutDate, request) {
+  const logId = `${checkoutDate}-${crypto.createHash('sha256').update(room).digest('hex').slice(0, 32)}`;
+  try {
+    await createRecord('push_send_logs', logId, {
+      room,
+      checkoutDate,
+      sentAt: Date.now(),
+      result: 'processing'
+    });
+  } catch (error) {
+    if (error.status === 409) return { room, result: 'already_sent' };
+    throw error;
+  }
   const tokens = tokensForRoom(root, room);
   if (!tokens.length) {
-    await logRef.update({ room, checkoutDate, sentAt: admin.database.ServerValue.TIMESTAMP, result: 'no_subscription' });
+    await saveRecord('push_send_logs', logId, { room, checkoutDate, sentAt: Date.now(), result: 'no_subscription' });
     return { room, result: 'no_subscription' };
   }
 
@@ -104,16 +99,16 @@ async function sendForRoom(db, root, room, checkoutDate, request) {
       const errorCode = delivery.error?.code;
       const invalid = ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(errorCode);
       outcomes.push({ id: entry.id, result: delivery.success ? 'sent' : `error_${errorCode || 'unknown'}` });
-      if (invalid) inactiveTokenUpdates.push(markTokenInactive(db, room, entry.id));
+      if (invalid) inactiveTokenUpdates.push(markTokenInactive(entry.id));
     });
   }
   await Promise.all(inactiveTokenUpdates);
   const result = outcomes.some(outcome => outcome.result === 'sent') ? 'sent' : 'failed';
-  await logRef.update({ room, checkoutDate, sentAt: admin.database.ServerValue.TIMESTAMP, result, deliveries: outcomes });
+  await saveRecord('push_send_logs', logId, { room, checkoutDate, sentAt: Date.now(), result, deliveries: outcomes });
   return { room, result, deliveries: outcomes.length };
 }
 
-async function sendManualForRoom(db, root, room, request, senderUid) {
+async function sendManualForRoom(root, room, request, senderUid) {
   const logId = crypto.randomUUID();
   const sentAt = Date.now();
   const tokens = tokensForRoom(root, room);
@@ -138,7 +133,7 @@ async function sendManualForRoom(db, root, room, request, senderUid) {
       const errorCode = delivery.error?.code;
       const invalid = ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(errorCode);
       outcomes.push({ id: entry.id, result: delivery.success ? 'sent' : `error_${errorCode || 'unknown'}` });
-      if (invalid) inactiveTokenUpdates.push(markTokenInactive(db, room, entry.id));
+      if (invalid) inactiveTokenUpdates.push(markTokenInactive(entry.id));
     });
   }
   await Promise.all(inactiveTokenUpdates);
@@ -149,36 +144,24 @@ async function sendManualForRoom(db, root, room, request, senderUid) {
   return { room, result, deliveries: outcomes.length };
 }
 
-async function markTokenInactive(db, room, id) {
-  await Promise.all([
-    db.ref(`fcmTokens/${room}/${id}/active`).set(false),
-    db.ref(`fcm_tokens/${room}/${id}/active`).set(false),
-    db.ref(`pushTokens/${room}/${id}/active`).set(false),
-    db.ref(`push_subscriptions/${id}/active`).set(false)
-  ]);
+async function markTokenInactive(id) {
+  await patchRecord('push_subscriptions', id, { active: false });
 }
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   try {
-    const database = getDatabase();
-    const actor = await authorizeRequest(req, database);
+    const actor = await authorizeRequest(req);
     const dateParts = todayInIstanbul();
     const checkoutDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
-    const [fcmTokens, fcmTokensLegacy, pushTokens, pushSubscriptions, hotelSettings, reservations] = await Promise.all([
-      database.ref('fcmTokens').once('value'),
-      database.ref('fcm_tokens').once('value'),
-      database.ref('pushTokens').once('value'),
-      database.ref('push_subscriptions').once('value'),
+    const [pushSubscriptions, hotelSettings, reservations] = await Promise.all([
+      listRecords('push_subscriptions'),
       getRecord('settings', 'main'),
       listRecords('reservations')
     ]);
     const root = {
-      fcmTokens: fcmTokens.val() || {},
-      fcm_tokens: fcmTokensLegacy.val() || {},
-      pushTokens: pushTokens.val() || {},
-      push_subscriptions: pushSubscriptions.val() || {},
+      push_subscriptions: pushSubscriptions,
       settings: hotelSettings || {},
       reservations
     };
@@ -188,14 +171,14 @@ module.exports = async function handler(req, res) {
     const rooms = new Set();
     if (actor.type === 'admin' && req.body?.manual === true) {
       if (!requestedRooms.length || !request.body) return res.status(400).json({ error: 'Manuel bildirim için en az bir oda ve mesaj gereklidir.' });
-      const results = await Promise.all(requestedRooms.map(room => sendManualForRoom(database, root, room, request, actor.uid)));
+      const results = await Promise.all(requestedRooms.map(room => sendManualForRoom(root, room, request, actor.uid)));
       return res.status(200).json({ ok: true, manual: true, results });
     }
     records(root.reservations).forEach(([, reservation]) => {
       if (isActiveReservation(reservation) && istanbulDate(reservation.checkoutDate) === checkoutDate && roomOf(reservation)) rooms.add(roomOf(reservation));
     });
     if (requestedRoom && !rooms.has(requestedRoom)) return res.status(200).json({ ok: true, timezone: TIME_ZONE, checkoutDate, results: [], skipped: 'room_is_not_due_today' });
-    const results = await Promise.all([...rooms].map(room => sendForRoom(database, root, room, checkoutDate, request)));
+    const results = await Promise.all([...rooms].map(room => sendForRoom(root, room, checkoutDate, request)));
     return res.status(200).json({ ok: true, timezone: TIME_ZONE, checkoutDate, results });
   } catch (error) {
     console.error('Push gönderimi başarısız:', error);

@@ -40,8 +40,7 @@ function getServiceAccount() {
 function getFirebaseAdmin() {
   if (!admin.apps.length) {
     admin.initializeApp({
-      credential: admin.credential.cert(getServiceAccount()),
-      databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://hotelss-5d21e-default-rtdb.firebaseio.com'
+      credential: admin.credential.cert(getServiceAccount())
     });
   }
   return admin;
