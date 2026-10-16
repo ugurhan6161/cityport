@@ -1,8 +1,4 @@
-const rooms = [
-  ['101','Temiz','clean','Zemin kat'],['102','Kirli','dirty','Zemin kat'],['103','Kontrol edildi','inspect','Zemin kat'],['104','Temizleniyor','progress','Zemin kat'],['105','Temiz','clean','Zemin kat'],['106','Kullanım dışı','broken','Zemin kat'],
-  ['201','Temiz','clean','1. kat'],['202','Kirli','dirty','1. kat'],['203','Temiz','clean','1. kat'],['204','Kontrol edildi','inspect','1. kat'],['205','Kirli','dirty','1. kat'],['206','Temiz','clean','1. kat'],
-  ['301','Temizleniyor','progress','2. kat'],['302','Temiz','clean','2. kat'],['303','Temiz','clean','2. kat'],['304','Kirli','dirty','2. kat'],['305','Temiz','clean','2. kat'],['306','Kontrol edildi','inspect','2. kat']
-];
+const rooms = [];
 const labels = {clean:'Temiz',dirty:'Kirli',progress:'Temizleniyor',inspect:'Kontrol edildi',broken:'Kullanım dışı'};
 const roomStatusPermissions = {
   admin: Object.keys(labels),
