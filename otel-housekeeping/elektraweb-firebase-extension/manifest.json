@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "ElektraWEB Oda Durumu Supabase Senkronizasyonu",
+  "version": "1.0.1",
+  "description": "ElektraWEB Room Rack oda durumlarını Supabase oda kayıtlarına aktarır.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*"
+  ],
+  "optional_host_permissions": ["https://*/*"],
+  "action": {
+    "default_title": "Oda durumu senkronizasyonu",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
